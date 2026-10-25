@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StudyPath • Intelligent Student Assignment Planner</title>
+  <meta name="description" content="A complete, secure student assignment planner with real backend authentication, SQLite persistence, Priority Queues, and Undo/Redo Stacks.">
+  
+  <!-- Modern Confident Typography: Plus Jakarta Sans, Outfit & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="styles.css">
+  
+  <!-- Progressive Web App (PWA) Manifest and Coffee-and-Cream Theme Configuration -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#8C532B">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="StudyPath">
+  <!-- App Favicons and Home Screen Touch Icons -->
+  <link rel="icon" type="image/png" sizes="64x64" href="icons/favicon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+</head>
+<body>
+  <!-- Accessibility skip link -->
+  <a href="#main-content" class="skip-to-content">Skip to planner content</a>
+
+  <!-- Live Announcer for screen readers -->
+  <div id="sr-announcements" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- Ambient glow accents -->
+  <div class="ambient-glow ambient-glow--primary" aria-hidden="true"></div>
+  <div class="ambient-glow ambient-glow--amber" aria-hidden="true"></div>
+
+  <!-- Initial Boot Session Loader -->
+  <div id="session-boot-loader" class="boot-loader" aria-label="Loading StudyPath" role="status">
+    <div class="spinner-ring" aria-hidden="true"></div>
+    <span class="boot-text">Connecting to StudyPath Secure Session...</span>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- 1. AUTHENTICATION VIEW (MANDATORY GATEWAY - ACCESS RESTRICTED) -->
+  <!-- ========================================================================= -->
+  <div id="auth-view" class="auth-page-container" hidden>
+    <div class="auth-card tilt-card">
+      <div class="auth-header">
+        <div class="auth-brand-logo" aria-hidden="true">
+          <img src="icons/logo-mark.png" alt="StudyPath Emblem Logo" class="auth-logo-img">
+        </div>
+        <h1 class="auth-brand-title">StudyPath</h1>
+        <p class="auth-brand-tagline">Plan • Study • Achieve</p>
+        <p class="auth-brand-desc">Personalized student assignment planner powered by Priority Queues.</p>
+        <div class="auth-security-badge">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+          <span>Account Required • Secure Backend Active</span>
+        </div>
+      </div>
+
+      <!-- Auth Navigation Tabs -->
+      <div class="auth-tabs" role="tablist" aria-label="Authentication views">
+        <button id="auth-tab-login" class="auth-tab is-active" role="tab" aria-selected="true" aria-controls="auth-panel-login">Log In</button>
+        <button id="auth-tab-signup" class="auth-tab" role="tab" aria-selected="false" aria-controls="auth-panel-signup">Sign Up</button>
+        <button id="auth-tab-forgot" class="auth-tab" role="tab" aria-selected="false" aria-controls="auth-panel-forgot">Forgot Password</button>
+      </div>
+
+      <!-- Shared Status / Error Banner -->
+      <div id="auth-alert" class="auth-alert" hidden role="alert" aria-live="assertive"></div>
+
+      <!-- A. LOG IN PANEL -->
+      <div id="auth-panel-login" class="auth-panel" role="tabpanel" aria-labelledby="auth-tab-login">
+        <form id="form-login" class="auth-form" novalidate>
+          <div class="form-group">
+            <label for="login-email" class="form-label">
+              Student Email <span class="required" aria-hidden="true">*</span>
+            </label>
+            <input 
+              type="email" 
+              id="login-email" 
+              class="form-input" 
+              placeholder="e.g., student@university.edu" 
+              required 
+              autocomplete="email"
+              aria-describedby="login-email-err"
+            >
+            <span id="login-email-err" class="form-error" aria-live="polite"></span>
+          </div>
+
+          <div class="form-group">
+            <div class="label-row">
+              <label for="login-password" class="form-label">
+                Password <span class="required" aria-hidden="true">*</span>
+              </label>
+              <button type="button" id="btn-forgot-link" class="text-link">Forgot password?</button>
+            </div>
+            <input 
+              type="password" 
+              id="login-password" 
+              class="form-input" 
+              placeholder="Enter your password" 
+              required 
+              autocomplete="current-password"
+              aria-describedby="login-password-err"
+            >
+            <span id="login-password-err" class="form-error" aria-live="polite"></span>
+          </div>
+
+          <!-- Keep Me Signed In Checkbox -->
+          <div class="form-group form-checkbox-group">
+            <label class="checkbox-label" for="login-remember">
+              <input type="checkbox" id="login-remember" class="form-checkbox" checked>
+              <span>Keep me signed in</span>
+            </label>
+          </div>
+
+          <button type="submit" id="btn-submit-login" class="btn btn--primary btn--full">
+            <span>Sign In to Your Planner</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- B. SIGN UP PANEL -->
+      <div id="auth-panel-signup" class="auth-panel" role="tabpanel" aria-labelledby="auth-tab-signup" hidden>
+        <form id="form-signup" class="auth-form" novalidate>
+          <div class="form-group">
+            <label for="signup-name" class="form-label">
+              Full Name <span class="required" aria-hidden="true">*</span>
+            </label>
+            <input 
+              type="text" 
+              id="signup-name" 
+              class="form-input" 
+              placeholder="e.g., Alex Rivera" 
+              required 
+              maxlength="60"
+              autocomplete="name"
+              aria-describedby="signup-name-err"
+            >
+            <span id="signup-name-err" class="form-error" aria-live="polite"></span>
+          </div>
+
+          <div class="form-group">
+            <label for="signup-email" class="form-label">
+              Student Email <span class="required" aria-hidden="true">*</span>
+            </label>
+            <input 
+              type="email" 
+              id="signup-email" 
+              class="form-input" 
+              placeholder="e.g., alex.rivera@university.edu" 
+              required 
+              autocomplete="email"
+              aria-describedby="signup-email-err"
+            >
+            <span id="signup-email-err" class="form-error" aria-live="polite"></span>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="signup-password" class="form-label">
+                Password <span class="required" aria-hidden="true">*</span>
+              </label>
+              <input 
+                type="password" 
+                id="signup-password" 
+                class="form-input" 
+                placeholder="Min. 8 characters" 
+                required 
+                minlength="8" 
+                autocomplete="new-password"
+                aria-describedby="signup-password-err"
+              >
+              <span id="signup-password-err" class="form-error" aria-live="polite"></span>
+            </div>
+
+            <div class="form-group">
+              <label for="signup-confirm-password" class="form-label">
+                Confirm Password <span class="required" aria-hidden="true">*</span>
+              </label>
+              <input 
+                type="password" 
+                id="signup-confirm-password" 
+                class="form-input" 
+                placeholder="Re-enter password" 
+                required 
+                autocomplete="new-password"
+                aria-describedby="signup-confirm-err"
+              >
+              <span id="signup-confirm-err" class="form-error" aria-live="polite"></span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="signup-major" class="form-label">Course / Major (Optional)</label>
+            <input 
+              type="text" 
+              id="signup-major" 
+              class="form-input" 
+              placeholder="e.g., Computer Science, Engineering, Biology" 
+              maxlength="50"
+            >
+          </div>
+
+          <button type="submit" id="btn-submit-signup" class="btn btn--primary btn--full">
+            <span>Create Your Account</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- C. FORGOT PASSWORD PANEL -->
+      <div id="auth-panel-forgot" class="auth-panel" role="tabpanel" aria-labelledby="auth-tab-forgot" hidden>
+        <!-- Step 1: Request Token -->
+        <form id="form-forgot-request" class="auth-form" novalidate>
+          <p class="auth-note">
+            Enter your registered student email. The system will generate a secure password reset token.
+          </p>
+          <div class="form-group">
+            <label for="forgot-email" class="form-label">
+              Student Email <span class="required" aria-hidden="true">*</span>
+            </label>
+            <input 
+              type="email" 
+              id="forgot-email" 
+              class="form-input" 
+              placeholder="e.g., student@university.edu" 
+              required
+              aria-describedby="forgot-email-err"
+            >
+            <span id="forgot-email-err" class="form-error" aria-live="polite"></span>
+          </div>
+
+          <button type="submit" id="btn-submit-forgot" class="btn btn--primary btn--full">
+            <span>Generate Reset Token</span>
+          </button>
+        </form>
+
+        <!-- Step 2: Confirm Token & Set New Password -->
+        <form id="form-reset-confirm" class="auth-form" novalidate hidden>
+          <div class="token-helper-box" id="token-helper-box">
+            <strong>Token Ready:</strong> Enter the token generated for your account below.
+          </div>
+
+          <div class="form-group">
+            <label for="reset-token" class="form-label">
+              Reset Token <span class="required" aria-hidden="true">*</span>
+            </label>
+            <input 
+              type="text" 
+              id="reset-token" 
+              class="form-input font-mono" 
+              placeholder="Paste your reset token" 
+              required
+              aria-describedby="reset-token-err"
+            >
+            <span id="reset-token-err" class="form-error" aria-live="polite"></span>
+          </div>
+
+          <div class="form-group">
+            <label for="reset-new-password" class="form-label">
+              New Password <span class="required" aria-hidden="true">*</span>
+            </label>
+            <input 
+              type="password" 
+              id="reset-new-password" 
+              class="form-input" 
+              placeholder="At least 8 characters" 
+              required 
+              minlength="8"
+              aria-describedby="reset-new-pass-err"
+            >
+            <span id="reset-new-pass-err" class="form-error" aria-live="polite"></span>
+          </div>
+
+          <button type="submit" id="btn-submit-reset-confirm" class="btn btn--accent btn--full">
+            <span>Update Password & Return to Login</span>
+          </button>
+        </form>
+      </div>
+
+      <div class="auth-footer-notice">
+        <span>🔒 Data Privacy: Passwords hashed with salted <strong>scrypt</strong>. Sessions secured via HTTP-only cookies.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- 2. AUTHENTICATED APP VIEW (PROTECTED PLANNER) -->
+  <!-- ========================================================================= -->
+  <div id="app-view" class="app-layout" hidden>
+
+    <!-- App Header -->
+    <header class="app-header" role="banner">
+      <div class="header-container">
+        <div class="brand-group">
+          <div class="brand-logo" aria-hidden="true">
+            <img src="icons/logo-mark.png" alt="StudyPath Logo" class="header-logo-img">
+          </div>
+          <div>
+            <span class="brand-title">StudyPath</span>
+            <span class="brand-badge" id="header-user-major">Planner</span>
+          </div>
+        </div>
+
+        <!-- Header Actions: User Profile, Stack Undo/Redo, Help, Add Assignment -->
+        <div class="header-actions">
+          <!-- Stack Controls (Undo / Redo Syncing to Backend) -->
+          <div class="stack-controls" role="group" aria-label="History actions">
+            <button id="btn-undo" class="icon-btn" title="Undo recent change (Ctrl+Z)" aria-label="Undo recent action" disabled>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 7v6h6"></path>
+                <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
+              </svg>
+              <span class="btn-label">Undo</span>
+              <span id="undo-count" class="counter-pill" aria-label="0 undo actions available">0</span>
+            </button>
+
+            <button id="btn-redo" class="icon-btn" title="Redo action (Ctrl+Y)" aria-label="Redo action" disabled>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 7v6h-6"></path>
+                <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"></path>
+              </svg>
+              <span class="btn-label">Redo</span>
+              <span id="redo-count" class="counter-pill" aria-label="0 redo actions available">0</span>
+            </button>
+          </div>
+
+          <button id="btn-sound-toggle" class="btn btn--subtle sound-toggle-btn" title="Toggle audio chime notifications" aria-label="Toggle chime sound">
+            <svg class="sound-icon-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <path class="sound-waves" d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            </svg>
+            <span id="sound-toggle-label">Sound: Ready</span>
+          </button>
+
+          <!-- PWA Install Action Button -->
+          <button id="btn-install-app" class="btn btn--subtle install-app-btn" title="Install StudyPath App to desktop or home screen" aria-label="Install StudyPath App" hidden>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span id="install-btn-text">Install App</span>
+          </button>
+
+          <button id="btn-how-it-works" class="btn btn--subtle" aria-haspopup="dialog" aria-expanded="false">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <span>How It Works</span>
+          </button>
+
+          <button id="btn-add-assignment" class="btn btn--primary" aria-haspopup="dialog" aria-expanded="false">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            <span>Add Assignment</span>
+          </button>
+
+          <!-- User Profile & Log Out Group -->
+          <div class="user-profile-menu">
+            <div class="user-avatar-pill" id="user-avatar-pill" title="Signed in account">
+              <span class="avatar-initials" id="user-initials">ST</span>
+              <span class="user-display-name" id="user-display-name">Student</span>
+            </div>
+            <button id="btn-logout" class="btn btn--subtle btn--sm logout-btn" title="Sign out of your account" aria-label="Sign out">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+              </svg>
+              <span>Log Out</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Layout -->
+    <main id="main-content" class="main-layout" tabindex="-1">
+
+      <!-- Real-Time Offline Network Status Banner -->
+      <section id="offline-banner" class="offline-banner" role="status" aria-live="polite" hidden>
+        <div class="offline-banner-content">
+          <div class="offline-icon-wrap" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="1" y1="1" x2="23" y2="23"></line>
+              <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path>
+              <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path>
+              <path d="M10.71 5.05A16 16 0 0 1 22.58 9"></path>
+              <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path>
+              <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+              <line x1="12" y1="20" x2="12.01" y2="20"></line>
+            </svg>
+          </div>
+          <div class="offline-text-group">
+            <strong class="offline-title">Offline Mode: Network Unavailable</strong>
+            <span class="offline-subtitle">The application interface is open from local cache. A secure network connection is required to sync, edit, or submit assignment changes.</span>
+          </div>
+        </div>
+        <button type="button" id="btn-retry-connection" class="btn btn--subtle btn--xs">
+          <span>Check Connection</span>
+        </button>
+      </section>
+
+      <!-- Real-Time In-App Due Alerts Banner -->
+      <section id="due-alerts-banner" class="due-alerts-banner" role="region" aria-label="Due and overdue assignment alerts" hidden>
+        <div class="due-alerts-header">
+          <div class="due-alerts-title-group">
+            <div class="due-alerts-badge-icon" aria-hidden="true">⚠️</div>
+            <div>
+              <h2 class="due-alerts-heading" id="due-alerts-heading">Urgent Coursework Alerts</h2>
+              <p class="due-alerts-subtitle" id="due-alerts-subtitle">Loading alert status...</p>
+            </div>
+          </div>
+          <div class="due-alerts-controls">
+            <button type="button" id="btn-enable-sound-banner" class="btn btn--subtle btn--xs">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+              <span id="banner-sound-text">Enable Audio Chime</span>
+            </button>
+            <button type="button" id="btn-dismiss-all-alerts" class="btn btn--ghost btn--xs" title="Dismiss active alerts for current session">
+              Dismiss All
+            </button>
+          </div>
+        </div>
+        <div id="due-alerts-list" class="due-alerts-list" role="list"></div>
+      </section>
+
+      <!-- Top Greeting & Live Stats Row -->
+      <section class="welcome-section" aria-labelledby="welcome-heading">
+        <div class="welcome-content">
+          <div class="welcome-text-group">
+            <div class="date-badge" id="current-date-badge">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+              <span id="live-date">Today's Schedule</span>
+            </div>
+            <h1 id="welcome-heading" class="welcome-title">Welcome back, <span id="welcome-user-name">Student</span>!</h1>
+            <p class="welcome-subtitle">Here is your live focus queue, calculated by priority weights and deadlines.</p>
+          </div>
+
+          <!-- Compact Progress Indicator -->
+          <div class="welcome-progress-card" id="dashboard-progress-card" role="region" aria-label="Coursework completion progress">
+            <div class="progress-card-header">
+              <div class="progress-card-label-wrap">
+                <span class="progress-card-icon" aria-hidden="true">🎯</span>
+                <span class="progress-card-title">Overall Completion</span>
+              </div>
+              <span class="progress-card-percent" id="dashboard-progress-percent">0%</span>
+            </div>
+            <div class="progress-card-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="dashboard-progressbar">
+              <div class="progress-card-fill" id="dashboard-progress-fill" style="width: 0%;"></div>
+            </div>
+            <div class="progress-card-footer">
+              <span class="progress-card-subtext" id="dashboard-progress-subtext">0 of 0 tasks completed</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- View Navigation Tabs -->
+        <nav class="view-nav-tabs" role="tablist" aria-label="Planner Views">
+          <button type="button" role="tab" id="tab-queue" class="view-tab-btn is-active" aria-selected="true" aria-controls="view-queue" data-view="queue">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            <span>Priority Queue</span>
+          </button>
+          <button type="button" role="tab" id="tab-calendar" class="view-tab-btn" aria-selected="false" aria-controls="view-calendar" data-view="calendar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            <span>Calendar</span>
+          </button>
+          <button type="button" role="tab" id="tab-workload" class="view-tab-btn" aria-selected="false" aria-controls="view-workload" data-view="workload">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+            <span>Workload & Insights</span>
+          </button>
+          <button type="button" role="tab" id="tab-sessions" class="view-tab-btn" aria-selected="false" aria-controls="view-sessions" data-view="sessions">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path></svg>
+            <span>Study Sessions</span>
+          </button>
+          <button type="button" role="tab" id="tab-reminders" class="view-tab-btn" aria-selected="false" aria-controls="view-reminders" data-view="reminders">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+            <span>Reminders</span>
+            <span class="tab-badge" id="reminders-count-badge" hidden>0</span>
+          </button>
+        </nav>
+
+        <!-- Metric counters (Interactive filters) -->
+        <div class="stats-row" role="region" aria-label="Assignment metrics summary">
+          <button class="stat-card" data-filter-status="due-soon" title="Click to filter assignments due soon">
+            <div class="stat-icon-wrapper stat-icon--amber" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+            </div>
+            <div class="stat-info">
+              <span class="stat-value" id="count-due-soon">0</span>
+              <span class="stat-label">Due Soon (&lt; 48h)</span>
+            </div>
+          </button>
+
+          <button class="stat-card" data-filter-status="overdue" title="Click to filter overdue assignments">
+            <div class="stat-icon-wrapper stat-icon--rose" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+              </svg>
+            </div>
+            <div class="stat-info">
+              <span class="stat-value" id="count-overdue">0</span>
+              <span class="stat-label">Overdue</span>
+            </div>
+          </button>
+
+          <button class="stat-card" data-filter-status="pending" title="Click to filter active pending assignments">
+            <div class="stat-icon-wrapper stat-icon--indigo" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+              </svg>
+            </div>
+            <div class="stat-info">
+              <span class="stat-value" id="count-active">0</span>
+              <span class="stat-label">In Queue</span>
+            </div>
+          </button>
+
+          <button class="stat-card" data-filter-status="completed" title="Click to filter completed assignments">
+            <div class="stat-icon-wrapper stat-icon--emerald" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+              </svg>
+            </div>
+            <div class="stat-info">
+              <span class="stat-value" id="count-completed">0</span>
+              <span class="stat-label">Completed</span>
+            </div>
+          </button>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- VIEW 1: PRIORITY QUEUE VIEW (SPOTLIGHT + FEED) -->
+      <!-- =================================================================== -->
+      <div id="view-queue" class="planner-view active-view" role="tabpanel" aria-labelledby="tab-queue">
+        <!-- Priority Queue Spotlight Card ("What should I work on next?") -->
+        <section class="spotlight-section" aria-labelledby="spotlight-heading">
+          <div class="spotlight-container tilt-card" id="spotlight-card">
+            <div class="spotlight-badge-row">
+              <span class="next-pill">
+                <span class="pulsing-dot" aria-hidden="true"></span>
+                Queue Head (Recommended Next)
+              </span>
+              <span class="queue-metric-tag" id="spotlight-urgency-tag">Queue Status: Analyzing</span>
+            </div>
+
+            <div class="spotlight-body" id="spotlight-content">
+              <!-- Dynamically populated by PriorityQueue.peekNext() -->
+            </div>
+          </div>
+        </section>
+
+        <!-- Queue Management & Controls Area -->
+        <section class="queue-section" aria-labelledby="queue-heading">
+          <div class="queue-toolbar">
+            <div class="toolbar-title-group">
+              <h2 id="queue-heading" class="section-title">Upcoming Work Queue</h2>
+              <span class="queue-count-badge" id="filtered-count-badge">Loading...</span>
+            </div>
+
+            <!-- Controls Form -->
+            <div class="toolbar-controls" role="search" aria-label="Search and filter assignments">
+              <!-- Live Instant Search -->
+              <div class="search-input-wrapper">
+                <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="search-input" placeholder="Search by title, subject, notes... (Press / to focus)" aria-label="Search assignments" autocomplete="off">
+                <button id="btn-clear-search" class="clear-search-btn" title="Clear search" aria-label="Clear search query" hidden>&times;</button>
+              </div>
+
+              <!-- Status Filter -->
+              <div class="control-select-group">
+                <label for="filter-status" class="sr-only">Filter by status</label>
+                <select id="filter-status" class="custom-select" aria-label="Filter assignments by status">
+                  <option value="all" selected>All Statuses</option>
+                  <option value="pending">Active & Pending</option>
+                  <option value="due-soon">Due Soon (&lt; 48h)</option>
+                  <option value="overdue">Overdue</option>
+                  <option value="completed">Completed</option>
+                </select>
+              </div>
+
+              <!-- Priority Filter -->
+              <div class="control-select-group">
+                <label for="filter-priority" class="sr-only">Filter by priority</label>
+                <select id="filter-priority" class="custom-select" aria-label="Filter assignments by priority">
+                  <option value="all" selected>All Priorities</option>
+                  <option value="high">High Priority</option>
+                  <option value="medium">Medium Priority</option>
+                  <option value="low">Low Priority</option>
+                </select>
+              </div>
+
+              <!-- Subject Filter -->
+              <div class="control-select-group">
+                <label for="filter-subject" class="sr-only">Filter by subject</label>
+                <select id="filter-subject" class="custom-select" aria-label="Filter assignments by subject">
+                  <option value="all" selected>All Subjects</option>
+                </select>
+              </div>
+
+              <!-- Sort Selector -->
+              <div class="control-select-group sort-group">
+                <span class="sort-prefix" aria-hidden="true">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="20" x2="18" y2="10"></line>
+                    <line x1="12" y1="20" x2="12" y2="4"></line>
+                    <line x1="6" y1="20" x2="6" y2="14"></line>
+                  </svg>
+                </span>
+                <label for="sort-select" class="sr-only">Sort assignments</label>
+                <select id="sort-select" class="custom-select" aria-label="Sort assignments by">
+                  <option value="queue-smart" selected>Queue Order (Smart Priority)</option>
+                  <option value="due-asc">Due Date (Earliest First)</option>
+                  <option value="due-desc">Due Date (Latest First)</option>
+                  <option value="priority-desc">Priority (High to Low)</option>
+                  <option value="subject-asc">Subject (A to Z)</option>
+                  <option value="title-asc">Title (A to Z)</option>
+                </select>
+              </div>
+
+              <!-- Reset Filter Button -->
+              <button id="btn-reset-filters" class="btn btn--subtle btn--sm" title="Clear all filters and search" aria-label="Reset all search filters">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
+                  <path d="M21 3v5h-5"></path>
+                  <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+                  <path d="M3 21v-5h5"></path>
+                </svg>
+                <span>Reset</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Assignments Feed Container -->
+          <div id="queue-container" class="queue-list" role="feed" aria-busy="false" aria-label="Ordered list of assignments"></div>
+
+          <!-- Empty State Container -->
+          <div id="empty-state" class="empty-state" hidden>
+            <div class="empty-icon" aria-hidden="true">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="m9 12 2 2 4-4"></path>
+              </svg>
+            </div>
+            <h3 class="empty-title" id="empty-title">Queue is clear!</h3>
+            <p class="empty-desc" id="empty-desc">You have no assignments matching this criteria.</p>
+            <div class="empty-actions">
+              <button id="btn-empty-reset" class="btn btn--secondary">Reset Filters</button>
+              <button id="btn-empty-add" class="btn btn--primary">Add Your First Assignment</button>
+            </div>
+          </div>
+
+          <!-- Footer Data Actions -->
+          <div class="queue-footer">
+            <div class="queue-info-hint">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+              </svg>
+              <span>Assignments saved to your personal account. Use <strong>Ctrl + Z</strong> to undo changes.</span>
+            </div>
+            <div class="footer-buttons">
+              <button id="btn-clear-completed" class="btn btn--subtle btn--sm" title="Remove completed assignments from the queue" aria-label="Clear completed assignments">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                <span>Clear Completed</span>
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- =================================================================== -->
+      <!-- VIEW 2: ACCESSIBLE CALENDAR VIEW (DAY & WEEK VIEWS) -->
+      <!-- =================================================================== -->
+      <div id="view-calendar" class="planner-view" role="tabpanel" aria-labelledby="tab-calendar" hidden>
+        <div class="calendar-card">
+          <div class="calendar-toolbar">
+            <div class="cal-nav-group">
+              <button id="btn-cal-prev" class="btn btn--subtle btn--sm" aria-label="Previous date period">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                <span>Prev</span>
+              </button>
+              <button id="btn-cal-today" class="btn btn--secondary btn--sm">Today</button>
+              <button id="btn-cal-next" class="btn btn--subtle btn--sm" aria-label="Next date period">
+                <span>Next</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              </button>
+            </div>
+
+            <div class="cal-title-group">
+              <h2 id="calendar-title" class="cal-heading">Loading calendar...</h2>
+            </div>
+
+            <div class="cal-controls-group">
+              <div class="view-mode-pill" role="group" aria-label="Calendar view type">
+                <button type="button" id="btn-view-week" class="mode-btn is-active" aria-pressed="true">Week View</button>
+                <button type="button" id="btn-view-day" class="mode-btn" aria-pressed="false">Day View</button>
+              </div>
+              <button id="btn-cal-add-session" class="btn btn--subtle btn--sm" title="Schedule recurring study block">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                <span>+ Study Block</span>
+              </button>
+              <button id="btn-cal-add-task" class="btn btn--primary btn--sm" title="Add assignment deadline">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                <span>+ Assignment</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Calendar View Body Container -->
+          <div id="calendar-body" class="calendar-body" role="region" aria-label="Calendar grid displaying deadlines and study sessions"></div>
+        </div>
+      </div>
+
+      <!-- =================================================================== -->
+      <!-- VIEW 3: TIME ESTIMATES, WORKLOAD VIEW & PROGRESS INSIGHTS -->
+      <!-- =================================================================== -->
+      <div id="view-workload" class="planner-view" role="tabpanel" aria-labelledby="tab-workload" hidden>
+        <!-- Top KPI Cards -->
+        <div class="insights-kpi-grid">
+          <div class="insight-card">
+            <span class="insight-label">This Week's Scheduled Workload</span>
+            <div class="insight-value-row">
+              <span class="insight-val" id="insights-week-hours">0.0</span>
+              <span class="insight-unit">hrs</span>
+            </div>
+            <span class="insight-subtext" id="insights-week-breakdown">0h assignments • 0h study blocks</span>
+          </div>
+
+          <div class="insight-card insight-card--amber">
+            <span class="insight-label">Overdue Backlog Workload</span>
+            <div class="insight-value-row">
+              <span class="insight-val highlight-amber" id="insights-overdue-hours">0.0</span>
+              <span class="insight-unit">hrs</span>
+            </div>
+            <span class="insight-subtext" id="insights-overdue-count">0 overdue assignments awaiting completion</span>
+          </div>
+
+          <div class="insight-card">
+            <span class="insight-label">Assignment Completion Rate</span>
+            <div class="insight-value-row">
+              <span class="insight-val highlight-emerald" id="insights-completion-rate">0%</span>
+            </div>
+            <span class="insight-subtext" id="insights-completion-subtext">0 completed of 0 total</span>
+          </div>
+
+          <div class="insight-card">
+            <span class="insight-label">Subtasks & Milestones</span>
+            <div class="insight-value-row">
+              <span class="insight-val highlight-indigo" id="insights-subtasks-rate">0%</span>
+            </div>
+            <span class="insight-subtext" id="insights-subtasks-subtext">0 completed of 0 total steps</span>
+          </div>
+        </div>
+
+        <!-- Overdue Workload Policy Callout -->
+        <div class="policy-callout-card" role="note" aria-labelledby="policy-title">
+          <div class="policy-icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+          </div>
+          <div class="policy-content">
+            <h3 id="policy-title" class="policy-title">How Overdue Workload Is Tracked</h3>
+            <p class="policy-desc">
+              Overdue assignments are quantified separately as an <strong>Overdue Backlog</strong> (<span id="policy-overdue-hrs">0.0 hrs</span>) rather than artificially lumped into today's schedule. This ensures your weekly calendar reflects realistic, forward-looking commitments while keeping past-due obligations clearly prioritized for resolution.
+            </p>
+          </div>
+        </div>
+
+        <!-- Daily Workload Distribution Bar Chart -->
+        <div class="chart-section-card">
+          <div class="card-header-row">
+            <div>
+              <h3 class="card-section-title">Weekly Workload Distribution</h3>
+              <p class="card-section-subtitle">Estimated hours planned per day across assignments due and scheduled study sessions.</p>
+            </div>
+            <span class="chart-legend">
+              <span class="legend-dot legend-dot--assignment"></span> Assignments Due
+              <span class="legend-dot legend-dot--session"></span> Study Sessions
+            </span>
+          </div>
+          <div id="workload-barchart-container" class="barchart-container" role="img" aria-label="Bar chart showing weekly workload per day"></div>
+        </div>
+
+        <!-- Two Columns: Subject Breakdown & Subtasks Milestones -->
+        <div class="insights-grid-two">
+          <div class="chart-section-card">
+            <h3 class="card-section-title">Estimated Workload by Course</h3>
+            <p class="card-section-subtitle">Distribution of pending academic workload across subjects.</p>
+            <div id="subject-breakdown-list" class="subject-breakdown-list"></div>
+          </div>
+
+          <div class="chart-section-card">
+            <h3 class="card-section-title">Upcoming Milestones & Subtasks</h3>
+            <p class="card-section-subtitle">Track granular progress across multi-step project deliverables.</p>
+            <div id="milestones-tracker-list" class="milestones-tracker-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- =================================================================== -->
+      <!-- VIEW 4: RECURRING STUDY SESSIONS -->
+      <!-- =================================================================== -->
+      <div id="view-sessions" class="planner-view" role="tabpanel" aria-labelledby="tab-sessions" hidden>
+        <div class="sessions-management-card">
+          <div class="card-header-row">
+            <div>
+              <h2 class="card-section-title">Recurring Study Sessions</h2>
+              <p class="card-section-subtitle">Set dedicated weekly study blocks for your courses. These blocks appear directly in your calendar view.</p>
+            </div>
+            <button id="btn-create-session-view" class="btn btn--primary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <span>Schedule Study Block</span>
+            </button>
+          </div>
+
+          <div id="sessions-container" class="sessions-list" role="list"></div>
+        </div>
+      </div>
+
+      <!-- =================================================================== -->
+      <!-- VIEW 5: REMINDERS & NOTIFICATION DELIVERY -->
+      <!-- =================================================================== -->
+      <div id="view-reminders" class="planner-view" role="tabpanel" aria-labelledby="tab-reminders" hidden>
+        <!-- Notification Permission Status Card -->
+        <div class="reminders-status-card" id="reminders-permission-card">
+          <div class="status-badge-group">
+            <div id="perm-status-indicator" class="perm-indicator perm--default" aria-hidden="true"></div>
+            <div>
+              <h3 id="perm-status-title" class="status-heading">Notification Delivery Status</h3>
+              <p id="perm-status-desc" class="status-desc">Checking browser notification capabilities...</p>
+            </div>
+          </div>
+          <div class="status-actions">
+            <button id="btn-enable-notifications" class="btn btn--primary btn--sm">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+              <span>Enable Browser Notifications</span>
+            </button>
+            <button id="btn-test-chime" class="btn btn--subtle btn--sm" title="Test in-app notification sound">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+              <span>Test Audio Chime</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Setup Architecture Explanation -->
+        <div class="policy-callout-card" role="region" aria-labelledby="setup-guide-title">
+          <div class="policy-icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4M12 8h.01"></path></svg>
+          </div>
+          <div class="policy-content">
+            <h3 id="setup-guide-title" class="policy-title">Real Notification Delivery Mechanism & Setup</h3>
+            <p class="policy-desc">
+              StudyPath enforces transparent notification tracking:
+            </p>
+            <ul class="setup-list">
+              <li><strong>Active In-Browser & Desktop Alerts:</strong> When permission is granted, StudyPath uses the standard Web Notifications API and Web Audio API to alert you with desktop popups and audio chimes while StudyPath is running.</li>
+              <li><strong>Offline / Closed-Browser Delivery Requirements:</strong> Delivering notifications when your browser is completely closed requires an external email service (configured via <code>SMTP_HOST</code>, <code>SMTP_PORT</code>, <code>SMTP_USER</code>, <code>SMTP_PASS</code>) or a Web Push server (configured via <code>VAPID_PUBLIC_KEY</code> and <code>VAPID_PRIVATE_KEY</code>) running with a scheduled cron worker.</li>
+              <li><strong>Integrity Guarantee:</strong> StudyPath only marks reminders as "Active & Scheduled" for channels that are genuinely configured on your device.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Scheduled Reminders Table -->
+        <div class="chart-section-card">
+          <div class="card-header-row">
+            <div>
+              <h3 class="card-section-title">Active Deadline Reminders</h3>
+              <p class="card-section-subtitle">Custom alarms and alerts scheduled for your upcoming deadlines.</p>
+            </div>
+          </div>
+          <div id="reminders-table-container" class="reminders-table-wrap"></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- 3. MODAL: ADD / EDIT ASSIGNMENT DIALOG -->
+  <!-- ========================================================================= -->
+  <div id="assignment-modal" class="modal-backdrop" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-card modal-card--large">
+      <div class="modal-header">
+        <h2 id="modal-title" class="modal-title">Add New Assignment</h2>
+        <button id="btn-modal-close" class="modal-close-btn" aria-label="Close dialog">&times;</button>
+      </div>
+
+      <form id="assignment-form" class="modal-form" novalidate>
+        <input type="hidden" id="form-assignment-id" value="">
+
+        <!-- Title Input -->
+        <div class="form-group">
+          <label for="form-title" class="form-label">
+            Assignment Title <span class="required" aria-hidden="true">*</span>
+          </label>
+          <input 
+            type="text" 
+            id="form-title" 
+            class="form-input" 
+            placeholder="e.g., Dynamic Programming Problem Set" 
+            required 
+            maxlength="100"
+            aria-describedby="title-error"
+          >
+          <span id="title-error" class="form-error" aria-live="polite"></span>
+        </div>
+
+        <!-- Subject & Priority Grid -->
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="form-subject" class="form-label">
+              Subject / Course <span class="required" aria-hidden="true">*</span>
+            </label>
+            <input 
+              type="text" 
+              id="form-subject" 
+              class="form-input" 
+              placeholder="e.g., Computer Science, Calculus, Physics" 
+              required 
+              maxlength="40"
+              aria-describedby="subject-error"
+            >
+            <span id="subject-error" class="form-error" aria-live="polite"></span>
+          </div>
+
+          <div class="form-group">
+            <label for="form-priority" class="form-label">
+              Priority Level <span class="required" aria-hidden="true">*</span>
+            </label>
+            <select id="form-priority" class="form-input custom-select" required>
+              <option value="high">High (Urgent / Exam / Project)</option>
+              <option value="medium" selected>Medium (Standard Homework)</option>
+              <option value="low">Low (Supplemental Reading)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Due Date & Time Estimate Grid -->
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="form-due-date" class="form-label">
+              Due Date & Time <span class="required" aria-hidden="true">*</span>
+            </label>
+            <input 
+              type="datetime-local" 
+              id="form-due-date" 
+              class="form-input" 
+              required
+              aria-describedby="date-error"
+            >
+            <span id="date-error" class="form-error" aria-live="polite"></span>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Estimated Workload</label>
+            <div class="time-estimate-input-row">
+              <div class="time-num-wrap">
+                <input type="number" id="form-est-hours" class="form-input time-num-input" min="0" max="48" value="1" aria-label="Estimated hours">
+                <span class="unit-text">hrs</span>
+              </div>
+              <div class="time-num-wrap">
+                <input type="number" id="form-est-mins" class="form-input time-num-input" min="0" max="59" step="5" value="30" aria-label="Estimated minutes">
+                <span class="unit-text">mins</span>
+              </div>
+              <input type="hidden" id="form-duration" value="1.5 hrs">
+            </div>
+            <div class="time-chips-preset" role="group" aria-label="Quick duration presets">
+              <button type="button" class="btn-time-preset" data-mins="30">30m</button>
+              <button type="button" class="btn-time-preset" data-mins="60">1h</button>
+              <button type="button" class="btn-time-preset is-active" data-mins="90">1.5h</button>
+              <button type="button" class="btn-time-preset" data-mins="120">2h</button>
+              <button type="button" class="btn-time-preset" data-mins="180">3h</button>
+              <button type="button" class="btn-time-preset" data-mins="240">4h+</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Subtasks and Milestones Builder -->
+        <div class="form-group subtasks-group">
+          <div class="section-label-row">
+            <div>
+              <label class="form-label mb-0">Subtasks & Milestones</label>
+              <span class="form-hint">Break this assignment into sequential steps with optional milestones.</span>
+            </div>
+            <button type="button" id="btn-add-subtask-step" class="btn btn--subtle btn--xs">+ Add Step</button>
+          </div>
+          <div id="form-subtasks-container" class="subtasks-builder-list" role="list"></div>
+        </div>
+
+        <!-- Notes -->
+        <div class="form-group">
+          <label for="form-notes" class="form-label">Notes & Instructions</label>
+          <textarea 
+            id="form-notes" 
+            class="form-input form-textarea" 
+            rows="2" 
+            placeholder="Add key rubric requirements, professor instructions, or study partner notes..."
+            maxlength="500"
+          ></textarea>
+        </div>
+
+        <!-- Reference Links Builder -->
+        <div class="form-group links-group">
+          <div class="section-label-row">
+            <div>
+              <label class="form-label mb-0">Reference Links & Resources</label>
+              <span class="form-hint">Save Canvas, GitHub, or documentation URLs (must start with http:// or https://).</span>
+            </div>
+            <button type="button" id="btn-add-link-item" class="btn btn--subtle btn--xs">+ Add Link</button>
+          </div>
+          <div id="form-links-container" class="links-builder-list" role="list"></div>
+        </div>
+
+        <!-- Deadline Reminder Option -->
+        <div class="form-group">
+          <label for="form-reminder-preset" class="form-label">Deadline Reminder Alert</label>
+          <div class="reminder-select-row">
+            <select id="form-reminder-preset" class="form-input custom-select">
+              <option value="none" selected>No Reminder</option>
+              <option value="15">15 minutes before due</option>
+              <option value="30">30 minutes before due</option>
+              <option value="60">1 hour before due</option>
+              <option value="120">2 hours before due</option>
+              <option value="1440">1 day before due</option>
+              <option value="custom">Custom date & time...</option>
+            </select>
+            <input type="datetime-local" id="form-reminder-custom" class="form-input" style="display:none;" aria-label="Custom reminder date and time">
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" id="btn-modal-cancel" class="btn btn--subtle">Cancel</button>
+          <button type="submit" id="btn-form-submit" class="btn btn--primary">
+            <span id="btn-submit-text">Save Assignment</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- 3B. MODAL: RECURRING STUDY SESSION DIALOG -->
+  <!-- ========================================================================= -->
+  <div id="study-session-modal" class="modal-backdrop" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="session-modal-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="session-modal-title" class="modal-title">Schedule Recurring Study Block</h2>
+        <button id="btn-session-modal-close" class="modal-close-btn" aria-label="Close dialog">&times;</button>
+      </div>
+
+      <form id="study-session-form" class="modal-form" novalidate>
+        <input type="hidden" id="form-session-id" value="">
+
+        <div class="form-group">
+          <label for="session-subject" class="form-label">
+            Course / Subject <span class="required" aria-hidden="true">*</span>
+          </label>
+          <input 
+            type="text" 
+            id="session-subject" 
+            class="form-input" 
+            placeholder="e.g., Computer Science, Calculus, Physics" 
+            required 
+            maxlength="40"
+            aria-describedby="session-subject-error"
+          >
+          <span id="session-subject-error" class="form-error" aria-live="polite"></span>
+        </div>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="session-day" class="form-label">
+              Day of the Week <span class="required" aria-hidden="true">*</span>
+            </label>
+            <select id="session-day" class="form-input custom-select" required>
+              <option value="1" selected>Monday</option>
+              <option value="2">Tuesday</option>
+              <option value="3">Wednesday</option>
+              <option value="4">Thursday</option>
+              <option value="5">Friday</option>
+              <option value="6">Saturday</option>
+              <option value="0">Sunday</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="session-start" class="form-label">
+              Start Time <span class="required" aria-hidden="true">*</span>
+            </label>
+            <input 
+              type="time" 
+              id="session-start" 
+              class="form-input" 
+              value="16:00" 
+              required
+              aria-describedby="session-time-error"
+            >
+            <span id="session-time-error" class="form-error" aria-live="polite"></span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="session-duration" class="form-label">
+            Session Duration <span class="required" aria-hidden="true">*</span>
+          </label>
+          <div class="time-estimate-input-row">
+            <div class="time-num-wrap">
+              <input type="number" id="session-duration" class="form-input time-num-input" min="15" max="480" step="15" value="60" required>
+              <span class="unit-text">mins</span>
+            </div>
+          </div>
+          <div class="time-chips-preset" id="session-time-chips" role="group" aria-label="Duration presets">
+            <button type="button" class="btn-time-preset" data-mins="30">30m</button>
+            <button type="button" class="btn-time-preset" data-mins="45">45m</button>
+            <button type="button" class="btn-time-preset is-active" data-mins="60">1 hr</button>
+            <button type="button" class="btn-time-preset" data-mins="90">1.5 hrs</button>
+            <button type="button" class="btn-time-preset" data-mins="120">2 hrs</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="session-notes" class="form-label">Session Goals & Notes</label>
+          <textarea 
+            id="session-notes" 
+            class="form-input form-textarea" 
+            rows="2" 
+            placeholder="e.g., Review weekly lectures, practice problem set questions, lab prep..."
+            maxlength="250"
+          ></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" id="btn-session-cancel" class="btn btn--subtle">Cancel</button>
+          <button type="submit" id="btn-session-submit" class="btn btn--primary">
+            <span id="btn-session-submit-text">Save Study Block</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- 4. MODAL: HOW IT WORKS (DATA STRUCTURES & ALGORITHMS ARCHITECTURE) -->
+  <!-- ========================================================================= -->
+  <div id="how-modal" class="modal-backdrop" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="how-title">
+    <div class="modal-card modal-card--large">
+      <div class="modal-header">
+        <div class="how-header-title">
+          <div class="tech-icon-pill" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+              <polyline points="2 17 12 22 22 17"></polyline>
+              <polyline points="2 12 12 17 22 12"></polyline>
+            </svg>
+          </div>
+          <div>
+            <h2 id="how-title" class="modal-title">Computer Science Inside StudyPath</h2>
+            <p class="modal-subtitle">How pure data structures, algorithms, and relational SQL power your workflow.</p>
+          </div>
+        </div>
+        <button id="btn-how-close" class="modal-close-btn" aria-label="Close dialog">&times;</button>
+      </div>
+
+      <div class="how-content">
+        <div class="ds-grid">
+          <article class="ds-card">
+            <div class="ds-icon-header">
+              <span class="ds-tag ds-tag--queue">Priority Queue</span>
+              <span class="ds-badge">Heuristic Ranking</span>
+            </div>
+            <h3>Intelligent "Next Up" Spotlight</h3>
+            <p>
+              The top card evaluates deadline proximity and priority weights to immediately answer <em>“What should I work on next?”</em>. Overdue and pressing items automatically bubble to the head of the queue.
+            </p>
+            <div class="code-snippet">
+              <code>Urgency = (1000 / (HoursLeft + 2)) + (PriorityWeight * 15)</code>
+            </div>
+          </article>
+
+          <article class="ds-card">
+            <div class="ds-icon-header">
+              <span class="ds-tag ds-tag--stack">Stack (LIFO)</span>
+              <span class="ds-badge">O(1) Undo/Redo</span>
+            </div>
+            <h3>Full-Stack Undo & Redo</h3>
+            <p>
+              Every mutation pushes an invertible delta onto <code>undoStack</code>. When popped, the reverse action is applied locally and synchronized with the backend database.
+            </p>
+            <div class="code-snippet">
+              <code>undoStack.push({ type: 'DELETE', item, index })</code>
+            </div>
+          </article>
+
+          <article class="ds-card">
+            <div class="ds-icon-header">
+              <span class="ds-tag ds-tag--search">Multi-Token Search</span>
+              <span class="ds-badge">Sub-millisecond</span>
+            </div>
+            <h3>Conjunctive Token Filter</h3>
+            <p>
+              Tokenizes your query across titles, course subjects, and personal notes. Filters evaluate instantaneously with zero layout thrashing.
+            </p>
+            <div class="code-snippet">
+              <code>tokens.every(t =&gt; normalizedItem.includes(t))</code>
+            </div>
+          </article>
+
+          <article class="ds-card">
+            <div class="ds-icon-header">
+              <span class="ds-tag ds-tag--sort">Relational Isolation</span>
+              <span class="ds-badge">SQL ACID</span>
+            </div>
+            <h3>Backend User Isolation</h3>
+            <p>
+              All records are stored in SQLite with foreign keys and strict per-user queries (<code>WHERE user_id = ?</code>). Unauthenticated requests receive 401 Unauthorized.
+            </p>
+            <div class="code-snippet">
+              <code>SELECT * FROM assignments WHERE user_id = ?</code>
+            </div>
+          </article>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" id="btn-how-done" class="btn btn--primary">Got It, Return to Planner</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PWA Installation Instructions Modal -->
+  <div id="install-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="install-modal-title" hidden>
+    <div class="modal-card modal-card--md">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <div class="pwa-badge-icon" aria-hidden="true">
+            <img src="icons/icon-192.png" alt="StudyPath App Icon" class="pwa-modal-logo-img">
+          </div>
+          <div>
+            <h3 id="install-modal-title" class="modal-title">Install StudyPath</h3>
+            <p class="modal-subtitle">Open StudyPath as a standalone desktop shortcut or home screen app</p>
+          </div>
+        </div>
+        <button type="button" id="btn-close-install-modal" class="modal-close-btn" aria-label="Close installation dialog">×</button>
+      </div>
+      <div class="modal-body" id="install-modal-body">
+        <div id="install-instructions-content" class="install-instructions-content">
+          <div id="platform-instructions-panel" class="install-steps-list"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="btn-dismiss-install-modal" class="btn btn--primary">Got It</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Service Worker Update Available Notification -->
+  <aside id="sw-update-banner" class="sw-update-banner" role="alert" aria-live="assertive" hidden style="display: none;">
+    <div class="sw-update-content">
+      <span class="sw-update-icon" aria-hidden="true">⚡</span>
+      <span id="sw-update-text">A new version of StudyPath is ready.</span>
+    </div>
+    <div class="sw-update-actions">
+      <button type="button" id="btn-sw-refresh" class="btn btn--primary btn--xs">Update Now</button>
+      <button type="button" id="btn-sw-dismiss" class="btn btn--ghost btn--xs" aria-label="Dismiss update notification">✕</button>
+    </div>
+  </aside>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container" aria-live="assertive" aria-atomic="true"></div>
+
+  <!-- Main Application Script -->
+  <script src="app.js"></script>
+</body>
+</html>

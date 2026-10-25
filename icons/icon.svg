@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8C532B"/>
+      <stop offset="100%" stop-color="#5E3418"/>
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#C27834"/>
+      <stop offset="100%" stop-color="#E5A866"/>
+    </linearGradient>
+    <filter id="dropGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#241812" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="512" height="512" rx="128" fill="url(#bgGrad)"/>
+  
+  <!-- Subtle inner ring accent -->
+  <rect x="24" y="24" width="464" height="464" rx="108" fill="none" stroke="url(#goldGrad)" stroke-width="4" stroke-opacity="0.35"/>
+
+  <!-- Academic Study Emblem -->
+  <g filter="url(#dropGlow)">
+    <!-- Graduation Cap Top Diamond -->
+    <path d="M256 120 L420 190 L256 260 L92 190 Z" fill="#FAF7F2"/>
+    
+    <!-- Skull Cap Base -->
+    <path d="M164 228 C164 228 164 316 256 316 C348 316 348 228 348 228 L320 220 C320 286 288 296 256 296 C224 296 192 286 192 220 Z" fill="#E8DFD3"/>
+
+    <!-- Tassel -->
+    <path d="M400 200 L416 280 L400 294 L396 280 Z" fill="#C27834"/>
+    <circle cx="400" cy="200" r="6" fill="#C27834"/>
+
+    <!-- Stack of Coursework Books -->
+    <path d="M136 340 L376 340 C386 340 392 346 392 354 L392 366 C392 374 386 380 376 380 L136 380 C126 380 120 374 120 366 L120 354 C120 346 126 340 136 340 Z" fill="#FAF7F2"/>
+    <path d="M120 358 L140 358 L140 376 L120 376 Z" fill="#C27834"/>
+    <line x1="160" y1="360" x2="368" y2="360" stroke="#8C532B" stroke-width="4" stroke-linecap="round"/>
+
+    <path d="M120 396 L392 396 C402 396 408 402 408 410 L408 422 C408 430 402 436 392 436 L120 436 C110 436 104 430 104 422 L104 410 C104 402 110 396 120 396 Z" fill="#FAF7F2"/>
+    <path d="M104 414 L124 414 L124 432 L104 432 Z" fill="#6E4A35"/>
+    <line x1="144" y1="416" x2="380" y2="416" stroke="#8C532B" stroke-width="4" stroke-linecap="round"/>
+  </g>
+</svg>
