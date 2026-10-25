@@ -148,8 +148,247 @@ function loadStoredPreferences() {
 }
 
 // ============================================================================
-// 3. API SERVICE LAYER
+// 3. API SERVICE LAYER (WITH RESILIENT CLIENT FALLBACK FOR STATIC / OFFLINE)
 // ============================================================================
+
+function getLocalStore() {
+  if (typeof window === 'undefined') return { users: [], assignments: {}, studySessions: {}, reminders: {} };
+  try {
+    const raw = localStorage.getItem('studypath_cloud_store');
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return { users: [], assignments: {}, studySessions: {}, reminders: {} };
+}
+
+function saveLocalStore(store) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem('studypath_cloud_store', JSON.stringify(store));
+  } catch (e) {}
+}
+
+function getActiveUserId() {
+  if (typeof window === 'undefined') return null;
+  try {
+    return localStorage.getItem('studypath_active_user_id') || sessionStorage.getItem('studypath_active_user_id');
+  } catch (e) {
+    return null;
+  }
+}
+
+function setActiveUserId(userId, rememberMe = true) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (userId) {
+      if (rememberMe) {
+        localStorage.setItem('studypath_active_user_id', userId);
+      } else {
+        sessionStorage.setItem('studypath_active_user_id', userId);
+      }
+    } else {
+      localStorage.removeItem('studypath_active_user_id');
+      sessionStorage.removeItem('studypath_active_user_id');
+    }
+  } catch (e) {}
+}
+
+function handleClientFallback(endpoint, options = {}) {
+  const method = (options.method || 'GET').toUpperCase();
+  let body = {};
+  if (options.body) {
+    body = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
+  }
+  const store = getLocalStore();
+  const urlPath = endpoint.split('?')[0];
+
+  // Auth: ME
+  if (urlPath === '/api/auth/me') {
+    const activeId = getActiveUserId();
+    const user = store.users.find(u => u.id === activeId);
+    return { user: user ? { id: user.id, name: user.name, email: user.email, major: user.major } : null };
+  }
+
+  // Auth: SIGNUP
+  if (urlPath === '/api/auth/signup' && method === 'POST') {
+    const { name, email, password, major } = body;
+    if (!name || !name.trim()) throw new Error('Full name is required.');
+    if (!email || !email.includes('@')) throw new Error('A valid email address is required.');
+    if (!password || password.length < 8) throw new Error('Password must be at least 8 characters.');
+
+    const existing = store.users.find(u => u.email.toLowerCase() === email.trim().toLowerCase());
+    if (existing) throw new Error('An account with this email already exists. Please log in.');
+
+    const newUser = {
+      id: 'user_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      password,
+      major: (major || 'Computer Science').trim()
+    };
+    store.users.push(newUser);
+    store.assignments[newUser.id] = store.assignments[newUser.id] || [];
+    store.studySessions[newUser.id] = store.studySessions[newUser.id] || [];
+    store.reminders[newUser.id] = store.reminders[newUser.id] || [];
+    saveLocalStore(store);
+    setActiveUserId(newUser.id, true);
+    return { user: { id: newUser.id, name: newUser.name, email: newUser.email, major: newUser.major } };
+  }
+
+  // Auth: LOGIN
+  if (urlPath === '/api/auth/login' && method === 'POST') {
+    const { email, password, rememberMe } = body;
+    const user = store.users.find(u => u.email.toLowerCase() === (email || '').trim().toLowerCase() && u.password === password);
+    if (!user) throw new Error('Invalid email or password.');
+    setActiveUserId(user.id, rememberMe !== false);
+    return { user: { id: user.id, name: user.name, email: user.email, major: user.major } };
+  }
+
+  // Auth: LOGOUT
+  if (urlPath === '/api/auth/logout' && method === 'POST') {
+    setActiveUserId(null);
+    return { message: 'Logged out successfully.' };
+  }
+
+  const activeId = getActiveUserId();
+  if (!activeId) {
+    if (method === 'GET') return { assignments: [], studySessions: [], reminders: [] };
+    throw new Error('Not authenticated.');
+  }
+
+  store.assignments[activeId] = store.assignments[activeId] || [];
+  store.studySessions[activeId] = store.studySessions[activeId] || [];
+  store.reminders[activeId] = store.reminders[activeId] || [];
+
+  // Assignments: GET
+  if (urlPath === '/api/assignments' && method === 'GET') {
+    return { assignments: store.assignments[activeId] };
+  }
+
+  // Assignments: POST
+  if (urlPath === '/api/assignments' && method === 'POST') {
+    const newAssignment = {
+      id: body.id || 'task_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      title: body.title,
+      subject: body.subject,
+      dueDate: body.dueDate,
+      priority: body.priority || 'medium',
+      estimatedMinutes: body.estimatedMinutes || 90,
+      estimatedDuration: body.estimatedDuration || '1.5 hrs',
+      notes: body.notes || '',
+      links: body.links || [],
+      subtasks: body.subtasks || [],
+      completed: Boolean(body.completed),
+      createdAt: body.createdAt || new Date().toISOString()
+    };
+    store.assignments[activeId].unshift(newAssignment);
+    saveLocalStore(store);
+    return { assignment: newAssignment };
+  }
+
+  // Assignments: PUT /api/assignments/:id
+  const assignMatch = urlPath.match(/^\/api\/assignments\/([^\/]+)$/);
+  if (assignMatch) {
+    const assignId = assignMatch[1];
+    if (method === 'PUT') {
+      const idx = store.assignments[activeId].findIndex(a => a.id === assignId);
+      if (idx !== -1) {
+        store.assignments[activeId][idx] = { ...store.assignments[activeId][idx], ...body, id: assignId };
+        saveLocalStore(store);
+        return { assignment: store.assignments[activeId][idx] };
+      }
+      return { assignment: body };
+    }
+    if (method === 'DELETE') {
+      store.assignments[activeId] = store.assignments[activeId].filter(a => a.id !== assignId);
+      saveLocalStore(store);
+      return { message: 'Deleted' };
+    }
+  }
+
+  // Assignments: PATCH /api/assignments/:id/complete
+  const completeMatch = urlPath.match(/^\/api\/assignments\/([^\/]+)\/complete$/);
+  if (completeMatch && method === 'PATCH') {
+    const assignId = completeMatch[1];
+    const idx = store.assignments[activeId].findIndex(a => a.id === assignId);
+    if (idx !== -1) {
+      store.assignments[activeId][idx].completed = Boolean(body.completed);
+      saveLocalStore(store);
+      return { assignment: store.assignments[activeId][idx] };
+    }
+    return { assignment: { id: assignId, completed: body.completed } };
+  }
+
+  // Study Sessions: GET
+  if (urlPath === '/api/study-sessions' && method === 'GET') {
+    return { studySessions: store.studySessions[activeId] };
+  }
+
+  // Study Sessions: POST
+  if (urlPath === '/api/study-sessions' && method === 'POST') {
+    const newSession = {
+      id: body.id || 'sess_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      subject: body.subject,
+      dayOfWeek: parseInt(body.dayOfWeek, 10),
+      startTime: body.startTime,
+      durationMinutes: parseInt(body.durationMinutes, 10) || 60,
+      createdAt: new Date().toISOString()
+    };
+    store.studySessions[activeId].push(newSession);
+    saveLocalStore(store);
+    return { session: newSession };
+  }
+
+  // Study Sessions: DELETE
+  const sessMatch = urlPath.match(/^\/api\/study-sessions\/([^\/]+)$/);
+  if (sessMatch && method === 'DELETE') {
+    const sessId = sessMatch[1];
+    store.studySessions[activeId] = store.studySessions[activeId].filter(s => s.id !== sessId);
+    saveLocalStore(store);
+    return { message: 'Deleted' };
+  }
+
+  // Reminders: GET
+  if (urlPath === '/api/reminders' && method === 'GET') {
+    return { reminders: store.reminders[activeId] };
+  }
+
+  // Reminders: POST
+  if (urlPath === '/api/reminders' && method === 'POST') {
+    const newRem = {
+      id: body.id || 'rem_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      assignmentId: body.assignmentId,
+      remindAt: body.remindAt,
+      offsetMinutes: body.offsetMinutes,
+      title: body.title,
+      status: 'pending',
+      createdAt: new Date().toISOString()
+    };
+    store.reminders[activeId].push(newRem);
+    saveLocalStore(store);
+    return { reminder: newRem };
+  }
+
+  // Reminders: DELETE
+  const remMatch = urlPath.match(/^\/api\/reminders\/([^\/]+)$/);
+  if (remMatch && method === 'DELETE') {
+    const remId = remMatch[1];
+    store.reminders[activeId] = store.reminders[activeId].filter(r => r.id !== remId);
+    saveLocalStore(store);
+    return { message: 'Deleted' };
+  }
+
+  // Reminders: PATCH dismiss
+  const dismissMatch = urlPath.match(/^\/api\/reminders\/([^\/]+)\/dismiss$/);
+  if (dismissMatch && method === 'PATCH') {
+    const remId = dismissMatch[1];
+    const rem = store.reminders[activeId].find(r => r.id === remId);
+    if (rem) rem.status = 'dismissed';
+    saveLocalStore(store);
+    return { reminder: rem };
+  }
+
+  return {};
+}
 
 async function apiRequest(endpoint, options = {}) {
   const config = {
@@ -165,17 +404,25 @@ async function apiRequest(endpoint, options = {}) {
     config.body = JSON.stringify(options.body);
   }
 
-  const response = await fetch(endpoint, config);
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    const err = new Error(data.error || `Request failed with status ${response.status}`);
-    err.status = response.status;
-    err.data = data;
-    throw err;
+  try {
+    const response = await fetch(endpoint, config);
+    if (!response.ok) {
+      if (response.status === 404 || response.status >= 500) {
+        return handleClientFallback(endpoint, options);
+      }
+      const data = await response.json().catch(() => ({}));
+      const err = new Error(data.error || `Request failed with status ${response.status}`);
+      err.status = response.status;
+      err.data = data;
+      throw err;
+    }
+    return await response.json().catch(() => ({}));
+  } catch (err) {
+    if (err.status && err.status < 500 && err.status !== 404) {
+      throw err;
+    }
+    return handleClientFallback(endpoint, options);
   }
-
-  return data;
 }
 
 // ============================================================================

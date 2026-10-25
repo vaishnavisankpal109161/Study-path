@@ -3,11 +3,9 @@
   "version": "1.0.0",
   "description": "Intelligent student assignment planner powered by Priority Queues, Undo/Redo Stacks, and real-time search.",
   "scripts": {
+    "build": "echo 'Static build ready'",
     "dev": "node server.js",
     "start": "node server.js"
-  },
-  "engines": {
-    "node": "24.x"
   },
   "keywords": [
     "assignment-planner",
