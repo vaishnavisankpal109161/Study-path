@@ -26,7 +26,10 @@ function loadEnv() {
 }
 loadEnv();
 
+const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+const isProduction = process.env.NODE_ENV === 'production' || isServerless;
 const PG_URL = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+
 let isPostgres = Boolean(PG_URL);
 let pgPool = null;
 let sqliteDb = null;
@@ -42,14 +45,19 @@ if (isPostgres) {
       max: 10,
       idleTimeoutMillis: 30000
     });
-    console.log('⚡ StudyPath Database: Connected to hosted PostgreSQL.');
+    console.log('⚡ StudyPath Database: Connected to persistent hosted PostgreSQL.');
   } catch (err) {
-    console.warn('⚠️ Failed to initialize PostgreSQL pool, falling back to SQLite:', err.message);
+    console.error('❌ Failed to initialize hosted PostgreSQL pool:', err.message);
+    if (isProduction) {
+      throw new Error(`Hosted database connection failed: ${err.message}. Production cannot operate without persistent hosted storage.`);
+    }
     isPostgres = false;
   }
-}
-
-if (!isPostgres) {
+} else if (isProduction) {
+  console.warn('⚠️ WARNING: Neither POSTGRES_URL nor DATABASE_URL is set in Vercel/production environment variables.');
+  console.warn('⚠️ StudyPath strictly disallows running on temporary /tmp filesystem in production to prevent account and data loss.');
+} else {
+  // Zero-Config Local Development Database (data/studypath.db)
   let DatabaseSync;
   try {
     ({ DatabaseSync } = require('node:sqlite'));
@@ -68,28 +76,16 @@ if (!isPostgres) {
     };
   }
 
-  const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
-  let DATA_DIR = path.join(__dirname, 'data');
-  if (isServerless) {
-    DATA_DIR = path.join('/tmp', 'studypath-data');
-  }
-
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-  } catch (e) {
-    DATA_DIR = path.join('/tmp', 'studypath-data');
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
+  const DATA_DIR = path.join(__dirname, 'data');
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
   }
 
   try {
     const DB_PATH = path.join(DATA_DIR, 'studypath.db');
     sqliteDb = new DatabaseSync(DB_PATH);
     sqliteDb.exec('PRAGMA foreign_keys = ON;');
-    sqliteDb.exec(isServerless ? 'PRAGMA journal_mode = MEMORY;' : 'PRAGMA journal_mode = WAL;');
+    sqliteDb.exec('PRAGMA journal_mode = WAL;');
     console.log(`📁 StudyPath Database: Local SQLite active at ${DB_PATH}`);
   } catch (diskErr) {
     console.warn('⚠️ SQLite disk error, fallback to memory database:', diskErr.message);
@@ -97,9 +93,21 @@ if (!isPostgres) {
   }
 }
 
+function assertDatabaseAvailable() {
+  if (isProduction && (!isPostgres || !pgPool)) {
+    const err = new Error(
+      'Persistent hosted database not configured: Please configure POSTGRES_URL or DATABASE_URL in your Vercel Project Settings > Environment Variables. StudyPath strictly disallows transient local storage in production to guarantee that user accounts, assignments, and sessions are permanently preserved.'
+    );
+    err.code = 'DATABASE_NOT_CONFIGURED';
+    err.statusCode = 503;
+    throw err;
+  }
+}
+
 // Automatically ensure schema on initialization
 let schemaInitialized = false;
 async function ensureSchema() {
+  assertDatabaseAvailable();
   if (schemaInitialized) return;
   try {
     const { PG_SCHEMA, SQLITE_SCHEMA } = require('./migrations');
@@ -120,10 +128,13 @@ async function ensureSchema() {
     }
     schemaInitialized = true;
   } catch (err) {
+    if (isProduction) throw err;
     console.warn('⚠️ Notice during schema verification:', err.message);
   }
 }
-ensureSchema().catch(() => {});
+if (!isProduction) {
+  ensureSchema().catch(() => {});
+}
 
 // Helper: Convert '?' placeholders to PostgreSQL '$1, $2, ...'
 function toPgSql(sql) {
@@ -683,8 +694,14 @@ async function getDueReminders(userId, nowIso = new Date().toISOString()) {
   return due;
 }
 
+function isProductionDatabaseConfigured() {
+  if (!isProduction) return true;
+  return Boolean(isPostgres && pgPool);
+}
+
 module.exports = {
   isPostgres,
+  isProductionDatabaseConfigured,
   createUser,
   getUserByEmail,
   getUserById,

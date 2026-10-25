@@ -390,9 +390,37 @@ function handleClientFallback(endpoint, options = {}) {
   return {};
 }
 
+function getStoredSessionToken() {
+  if (typeof window === 'undefined') return null;
+  try {
+    return localStorage.getItem('studypath_session_token') || sessionStorage.getItem('studypath_session_token') || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function setStoredSessionToken(token, rememberMe = true) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (token) {
+      if (rememberMe) {
+        localStorage.setItem('studypath_session_token', token);
+        sessionStorage.removeItem('studypath_session_token');
+      } else {
+        sessionStorage.setItem('studypath_session_token', token);
+        localStorage.removeItem('studypath_session_token');
+      }
+    } else {
+      localStorage.removeItem('studypath_session_token');
+      sessionStorage.removeItem('studypath_session_token');
+    }
+  } catch (e) {}
+}
+
 async function apiRequest(endpoint, options = {}) {
   const config = {
     method: options.method || 'GET',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       ...options.headers
@@ -400,29 +428,25 @@ async function apiRequest(endpoint, options = {}) {
     ...options
   };
 
+  const token = getStoredSessionToken();
+  if (token && !config.headers['Authorization']) {
+    config.headers['Authorization'] = `Bearer ${token}`;
+  }
+
   if (options.body && typeof options.body === 'object') {
     config.body = JSON.stringify(options.body);
   }
 
-  try {
-    const response = await fetch(endpoint, config);
-    if (!response.ok) {
-      if (response.status === 404 || response.status >= 500) {
-        return handleClientFallback(endpoint, options);
-      }
-      const data = await response.json().catch(() => ({}));
-      const err = new Error(data.error || `Request failed with status ${response.status}`);
-      err.status = response.status;
-      err.data = data;
-      throw err;
-    }
-    return await response.json().catch(() => ({}));
-  } catch (err) {
-    if (err.status && err.status < 500 && err.status !== 404) {
-      throw err;
-    }
-    return handleClientFallback(endpoint, options);
+  const response = await fetch(endpoint, config);
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    const err = new Error(data.error || `Request failed with status ${response.status}`);
+    err.status = response.status;
+    err.code = data.code;
+    err.data = data;
+    throw err;
   }
+  return await response.json().catch(() => ({}));
 }
 
 // ============================================================================
@@ -569,6 +593,7 @@ async function handleLogout() {
   } catch (e) {
     console.warn('Logout network error', e);
   } finally {
+    setStoredSessionToken(null);
     if (typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined') {
       try {
         sessionStorage.removeItem('studypath_redirect_after_login');
@@ -2634,7 +2659,7 @@ function initAuthHandlers() {
     emailErr.textContent = '';
     passErr.textContent = '';
 
-    const email = emailEl.value.trim();
+    const email = emailEl.value.trim().toLowerCase();
     const password = passEl.value;
     const rememberMe = document.getElementById('login-remember')?.checked ?? true;
 
@@ -2662,6 +2687,9 @@ function initAuthHandlers() {
 
       passEl.value = '';
       currentUser = data.user;
+      if (data.sessionToken) {
+        setStoredSessionToken(data.sessionToken, rememberMe);
+      }
 
       let savedRedirect = null;
       if (typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined') {
@@ -2740,7 +2768,7 @@ function initAuthHandlers() {
     confirmErr.textContent = '';
 
     const name = nameEl.value.trim();
-    const email = emailEl.value.trim();
+    const email = emailEl.value.trim().toLowerCase();
     const password = passEl.value;
     const confirm = confirmEl.value;
     const major = majorEl.value.trim();
@@ -2778,11 +2806,33 @@ function initAuthHandlers() {
       passEl.value = '';
       confirmEl.value = '';
       currentUser = data.user;
+      if (data.sessionToken) {
+        setStoredSessionToken(data.sessionToken, true);
+      }
       showAppView();
       await loadAllUserData();
       showToast(`Account created! Welcome, ${currentUser.name}.`);
     } catch (err) {
-      setAuthAlert(err.message, 'error');
+      if (err.message && err.message.toLowerCase().includes('already exists')) {
+        setAuthAlert(
+          `<span>An account with <strong>${escapeHTML(email)}</strong> already exists.</span> <a href="#" id="auth-alert-login-link" style="color:var(--accent-coffee);font-weight:700;text-decoration:underline;margin-left:8px;">Switch to Log In &rarr;</a>`,
+          'error'
+        );
+        const link = document.getElementById('auth-alert-login-link');
+        if (link) {
+          link.addEventListener('click', (ev) => {
+            ev.preventDefault();
+            switchAuthTab('login');
+            const loginEmail = document.getElementById('login-email');
+            if (loginEmail) {
+              loginEmail.value = email;
+              document.getElementById('login-password')?.focus();
+            }
+          });
+        }
+      } else {
+        setAuthAlert(err.message, 'error');
+      }
       passEl.value = '';
       confirmEl.value = '';
     } finally {

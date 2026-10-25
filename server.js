@@ -163,7 +163,8 @@ async function handleRequest(req, res) {
         if (!name || !name.trim()) {
           return sendJson(res, 400, { error: 'Full name is required.' });
         }
-        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+        const normalizedEmail = (email || '').trim().toLowerCase();
+        if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
           return sendJson(res, 400, { error: 'A valid email address is required.' });
         }
         if (!password || password.length < 8) {
@@ -171,7 +172,7 @@ async function handleRequest(req, res) {
         }
 
         // Check duplicate
-        const existing = await db.getUserByEmail(email);
+        const existing = await db.getUserByEmail(normalizedEmail);
         if (existing) {
           return sendJson(res, 409, { error: 'An account with this email already exists. Please log in.' });
         }
@@ -182,11 +183,11 @@ async function handleRequest(req, res) {
 
         const user = await db.createUser({
           id: userId,
-          email,
+          email: normalizedEmail,
           passwordHash,
           salt,
-          name,
-          major
+          name: name.trim(),
+          major: major ? major.trim() : null
         });
 
         // Create Session & Set Secure HTTP-only Cookie
@@ -194,8 +195,11 @@ async function handleRequest(req, res) {
         const { expiresAt } = await db.createSession(sessionToken, user.id, SESSION_EXPIRY_HOURS);
         const cookieMaxAge = SESSION_EXPIRY_HOURS * 3600;
 
-        const cookieHeader = `${SESSION_COOKIE_NAME}=${sessionToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${cookieMaxAge}`;
-        return sendJson(res, 201, { user }, { 'Set-Cookie': cookieHeader });
+        let cookieHeader = `${SESSION_COOKIE_NAME}=${sessionToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${cookieMaxAge}`;
+        if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+          cookieHeader += '; Secure';
+        }
+        return sendJson(res, 201, { user, sessionToken }, { 'Set-Cookie': cookieHeader });
       }
 
       // 2. AUTH: Log In
@@ -207,7 +211,8 @@ async function handleRequest(req, res) {
           return sendJson(res, 400, { error: 'Please provide both email and password.' });
         }
 
-        const userRecord = await db.getUserByEmail(email);
+        const normalizedEmail = (email || '').trim().toLowerCase();
+        const userRecord = await db.getUserByEmail(normalizedEmail);
         if (!userRecord || !auth.verifyPassword(password, userRecord.salt, userRecord.password_hash)) {
           return sendJson(res, 401, { error: 'Invalid email or password.' });
         }
@@ -218,6 +223,9 @@ async function handleRequest(req, res) {
         const { expiresAt } = await db.createSession(sessionToken, userRecord.id, sessionHours);
 
         let cookieHeader = `${SESSION_COOKIE_NAME}=${sessionToken}; Path=/; HttpOnly; SameSite=Lax`;
+        if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+          cookieHeader += '; Secure';
+        }
         if (isPersistent) {
           const cookieMaxAge = sessionHours * 3600;
           cookieHeader += `; Max-Age=${cookieMaxAge}`;
@@ -231,7 +239,7 @@ async function handleRequest(req, res) {
           createdAt: userRecord.created_at
         };
 
-        return sendJson(res, 200, { user, rememberMe: isPersistent }, { 'Set-Cookie': cookieHeader });
+        return sendJson(res, 200, { user, sessionToken, rememberMe: isPersistent }, { 'Set-Cookie': cookieHeader });
       }
 
       // 3. AUTH: Check Current Session (Me)
@@ -250,7 +258,10 @@ async function handleRequest(req, res) {
         if (token) {
           await db.deleteSession(token);
         }
-        const clearCookie = `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
+        let clearCookie = `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
+        if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+          clearCookie += '; Secure';
+        }
         return sendJson(res, 200, { success: true }, { 'Set-Cookie': clearCookie });
       }
 
