@@ -890,7 +890,8 @@ async function handleRequest(req, res) {
 
     } catch (apiErr) {
       console.error('API Error:', apiErr);
-      return sendJson(res, 500, { error: apiErr.message || 'Internal Server Error' });
+      const statusCode = apiErr.statusCode || apiErr.status || 500;
+      return sendJson(res, statusCode, { error: apiErr.message || 'Internal Server Error', code: apiErr.code || 'SERVER_ERROR' });
     }
   }
 
