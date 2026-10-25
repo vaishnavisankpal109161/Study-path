@@ -4020,16 +4020,28 @@ function initPwaHandlers() {
 }
 
 // ============================================================================
-// 16. BOOTSTRAP
+// 16. BOOTSTRAP (Client Lifecycle After Mount)
 // ============================================================================
 
-document.addEventListener('DOMContentLoaded', () => {
-  loadStoredPreferences();
-  updateTodayDateDisplay();
-  initEventListeners();
-  startCountdownTimer();
-  checkAuthSession();
-  attach3DTilt();
-  initPwaHandlers();
-});
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      loadStoredPreferences();
+      updateTodayDateDisplay();
+      initEventListeners();
+      startCountdownTimer();
+      checkAuthSession();
+      attach3DTilt();
+      initPwaHandlers();
+    });
+  } else {
+    loadStoredPreferences();
+    updateTodayDateDisplay();
+    initEventListeners();
+    startCountdownTimer();
+    checkAuthSession();
+    attach3DTilt();
+    initPwaHandlers();
+  }
+}
 
