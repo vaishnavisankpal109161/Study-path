@@ -133,7 +133,20 @@ async function authenticateRequest(req) {
  */
 async function handleRequest(req, res) {
   const urlObj = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-  const pathname = urlObj.pathname;
+  let pathname = urlObj.pathname;
+
+  // Resolve Vercel serverless rewrites
+  if (pathname === '/api/index.js' || pathname === '/api' || pathname === '/api/') {
+    const routeParam = urlObj.searchParams.get('__route');
+    if (routeParam) {
+      pathname = routeParam.startsWith('/') ? routeParam : '/api/' + routeParam;
+    } else if (req.headers['x-matched-path']) {
+      pathname = req.headers['x-matched-path'];
+    } else if (req.headers['x-forwarded-uri']) {
+      pathname = req.headers['x-forwarded-uri'].split('?')[0];
+    }
+  }
+
   const method = req.method.toUpperCase();
 
   // --------------------------------------------------------------------------
