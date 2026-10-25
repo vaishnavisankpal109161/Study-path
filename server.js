@@ -68,6 +68,16 @@ function parseCookies(cookieHeader) {
  * JSON Body Reader Helper
  */
 function readJsonBody(req) {
+  if (req.body && typeof req.body === 'object') {
+    return Promise.resolve(req.body);
+  }
+  if (typeof req.body === 'string') {
+    try {
+      return Promise.resolve(JSON.parse(req.body));
+    } catch {
+      return Promise.resolve({});
+    }
+  }
   return new Promise((resolve, reject) => {
     let body = '';
     req.on('data', chunk => {
@@ -104,10 +114,10 @@ function sendJson(res, statusCode, data, extraHeaders = {}) {
  * Authentication Middleware: Resolves user from session cookie or Bearer header
  */
 function authenticateRequest(req) {
-  const cookies = parseCookies(req.headers.cookie);
+  const cookies = req.cookies || parseCookies(req.headers?.cookie);
   let token = cookies[SESSION_COOKIE_NAME];
 
-  if (!token && req.headers.authorization) {
+  if (!token && req.headers?.authorization) {
     const parts = req.headers.authorization.split(' ');
     if (parts.length === 2 && parts[0] === 'Bearer') {
       token = parts[1];
@@ -932,10 +942,14 @@ function startServer(port) {
     console.log(`  🔒 Database: ${path.join(ROOT_DIR, 'data', 'studypath.db')}\n`);
     console.log(`  Press Ctrl + C to stop the server.\n`);
 
-    if (process.platform === 'win32') {
+    if (process.platform === 'win32' && !process.env.VERCEL && !process.env.CI) {
       exec(`start "" "${url}"`);
     }
   });
 }
 
-startServer(INITIAL_PORT);
+module.exports = handleRequest;
+
+if (require.main === module) {
+  startServer(INITIAL_PORT);
+}

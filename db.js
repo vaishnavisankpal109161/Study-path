@@ -7,17 +7,32 @@ const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
 const fs = require('fs');
 
-const DATA_DIR = path.join(__dirname, 'data');
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+let DATA_DIR = path.join(__dirname, 'data');
+const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+if (isServerless) {
+  DATA_DIR = path.join('/tmp', 'studypath-data');
+}
+try {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+} catch (e) {
+  DATA_DIR = path.join('/tmp', 'studypath-data');
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
 }
 
 const DB_PATH = path.join(DATA_DIR, 'studypath.db');
 const db = new DatabaseSync(DB_PATH);
 
-// Enable foreign keys and WAL journal mode for ACID concurrency
+// Enable foreign keys and appropriate journal mode
 db.exec('PRAGMA foreign_keys = ON;');
-db.exec('PRAGMA journal_mode = WAL;');
+if (isServerless) {
+  db.exec('PRAGMA journal_mode = MEMORY;');
+} else {
+  db.exec('PRAGMA journal_mode = WAL;');
+}
 
 /**
  * Helpers for time estimate parsing and formatting

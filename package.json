@@ -2,10 +2,12 @@
   "name": "studypath-assignment-planner",
   "version": "1.0.0",
   "description": "Intelligent student assignment planner powered by Priority Queues, Undo/Redo Stacks, and real-time search.",
-  "main": "server.js",
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js"
+  },
+  "engines": {
+    "node": "22.x"
   },
   "keywords": [
     "assignment-planner",
