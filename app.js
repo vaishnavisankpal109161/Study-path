@@ -2277,13 +2277,23 @@ async function saveAssignmentFromForm(formData, reminderOption) {
 // 10. MODALS & FORMS (ASSIGNMENTS & RECURRING STUDY SESSIONS)
 // ============================================================================
 
-const modalBackdrop = document.getElementById('assignment-modal');
-const assignmentForm = document.getElementById('assignment-form');
-const howModal = document.getElementById('how-modal');
-const sessionModal = document.getElementById('study-session-modal');
-const sessionForm = document.getElementById('study-session-form');
+let modalBackdrop = null;
+let assignmentForm = null;
+let howModal = null;
+let sessionModal = null;
+let sessionForm = null;
+
+function initModalElements() {
+  if (typeof document === 'undefined') return;
+  if (!modalBackdrop) modalBackdrop = document.getElementById('assignment-modal');
+  if (!assignmentForm) assignmentForm = document.getElementById('assignment-form');
+  if (!howModal) howModal = document.getElementById('how-modal');
+  if (!sessionModal) sessionModal = document.getElementById('study-session-modal');
+  if (!sessionForm) sessionForm = document.getElementById('study-session-form');
+}
 
 function openAssignmentModal(idToEdit = null) {
+  initModalElements();
   if (!modalBackdrop || !assignmentForm) return;
 
   const modalTitle = document.getElementById('modal-title');
@@ -3103,6 +3113,8 @@ function updateTodayDateDisplay() {
 // ============================================================================
 
 function initEventListeners() {
+  initModalElements();
+
   // Undo & Redo buttons
   document.getElementById('btn-undo')?.addEventListener('click', performUndo);
   document.getElementById('btn-redo')?.addEventListener('click', performRedo);
