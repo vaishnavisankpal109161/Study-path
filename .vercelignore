@@ -1,6 +1,6 @@
-server.js
-db.js
-auth.js
-api/
-data/
+.git
+.env
+data/studypath.db
 *.log
+scratch/
+tests/

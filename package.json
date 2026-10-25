@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "description": "Intelligent student assignment planner powered by Priority Queues, Undo/Redo Stacks, and real-time search.",
   "scripts": {
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "build": "node migrations.js",
+    "migrate": "node migrations.js",
+    "migrate:hosted": "node migrate_sqlite_to_hosted.js"
   },
   "keywords": [
     "assignment-planner",
@@ -12,5 +15,8 @@
     "data-structures"
   ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "pg": "^8.23.1"
+  }
 }

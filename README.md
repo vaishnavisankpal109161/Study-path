@@ -292,3 +292,34 @@ When deploying to a public server or cloud provider:
 * **Apple iOS & iPadOS (Safari)**: Does not support the `beforeinstallprompt` JavaScript API. Users must manually tap the **Share** button in Safari and select **Add to Home Screen**. Once added, iOS launches the PWA in standalone mode (`apple-mobile-web-app-capable: yes`). Note that third-party browsers on iOS (Chrome/Firefox for iOS) only support web clips or redirect through Safari for Home Screen addition.
 * **Mozilla Firefox (Desktop)**: Firefox Desktop does not support standalone desktop PWA installation natively without third-party extensions. Users can bookmark or use desktop notifications.
 
+---
+
+## 🚀 Vercel Production Deployment & Hosted Database Setup
+
+StudyPath is configured for full-stack deployment on Vercel with zero friction:
+
+### Architecture
+- **Frontend Assets**: Statically hosted on Vercel's Edge CDN (`index.html`, `app.js`, `styles.css`, `manifest.json`, `sw.js`, `icons/`). Client-only APIs (`document`, `window`, `localStorage`, `sessionStorage`, `navigator`) are safely isolated to browser mount lifecycles.
+- **Serverless API**: Handled by Vercel Serverless Function at `api/index.js`, receiving all `/api/*` REST endpoints.
+- **Hosted Persistent Database**: Connects to any standard PostgreSQL provider (Vercel Postgres, Neon, Supabase, Render, Railway, AWS RDS) via `POSTGRES_URL` or `DATABASE_URL`.
+- **Local SQLite Fallback**: When running locally without external variables, StudyPath automatically falls back to the local SQLite database at `data/studypath.db`.
+
+### Vercel Environment Variables
+Set the following environment variable in **Vercel Project Settings > Environment Variables**:
+
+| Variable Name | Required | Description | Example |
+| :--- | :--- | :--- | :--- |
+| `POSTGRES_URL` *(or `DATABASE_URL`)* | **Production** | Secure connection string to your hosted PostgreSQL database. | `postgres://user:pass@ep-cool-db.us-east-2.aws.neon.tech/neondb?sslmode=require` |
+| `SESSION_EXPIRY_HOURS` | Optional | Session duration in hours (defaults to 72). | `72` |
+| `SESSION_COOKIE_NAME` | Optional | Custom session cookie name. | `studypath_session` |
+
+> ⚠️ **Security Guarantee**: Never include secret database credentials or connection strings in client-side code (`app.js`, `index.html`) or client environment variables (`NEXT_PUBLIC_*`). All database queries execute strictly inside the secure serverless backend.
+
+### Database Migrations & Data Preservation
+1. **Automated Build Migration**: During Vercel deployment (`npm run build`), `migrations.js` automatically applies table schemas and indexes (`users`, `sessions`, `assignments`, `subtasks`, `study_sessions`, `reminders`).
+2. **Automated Seed Restoration**: If a brand-new hosted database is connected, it automatically restores all preserved user accounts, assignments, and study sessions from `data/seed_data.json` so no student data is lost.
+3. **Manual CLI Migration**: To manually migrate local SQLite data directly to your hosted database:
+   ```bash
+   POSTGRES_URL="your-connection-string" npm run migrate:hosted
+   ```
+

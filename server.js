@@ -113,7 +113,7 @@ function sendJson(res, statusCode, data, extraHeaders = {}) {
 /**
  * Authentication Middleware: Resolves user from session cookie or Bearer header
  */
-function authenticateRequest(req) {
+async function authenticateRequest(req) {
   const cookies = req.cookies || parseCookies(req.headers?.cookie);
   let token = cookies[SESSION_COOKIE_NAME];
 
@@ -125,7 +125,7 @@ function authenticateRequest(req) {
   }
 
   if (!token) return null;
-  return db.getSessionUser(token);
+  return await db.getSessionUser(token);
 }
 
 /**
@@ -158,7 +158,7 @@ async function handleRequest(req, res) {
         }
 
         // Check duplicate
-        const existing = db.getUserByEmail(email);
+        const existing = await db.getUserByEmail(email);
         if (existing) {
           return sendJson(res, 409, { error: 'An account with this email already exists. Please log in.' });
         }
@@ -167,7 +167,7 @@ async function handleRequest(req, res) {
         const passwordHash = auth.hashPassword(password, salt);
         const userId = 'user_' + crypto.randomBytes(8).toString('hex');
 
-        const user = db.createUser({
+        const user = await db.createUser({
           id: userId,
           email,
           passwordHash,
@@ -178,7 +178,7 @@ async function handleRequest(req, res) {
 
         // Create Session & Set Secure HTTP-only Cookie
         const sessionToken = auth.generateSessionToken();
-        const { expiresAt } = db.createSession(sessionToken, user.id, SESSION_EXPIRY_HOURS);
+        const { expiresAt } = await db.createSession(sessionToken, user.id, SESSION_EXPIRY_HOURS);
         const cookieMaxAge = SESSION_EXPIRY_HOURS * 3600;
 
         const cookieHeader = `${SESSION_COOKIE_NAME}=${sessionToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${cookieMaxAge}`;
@@ -194,7 +194,7 @@ async function handleRequest(req, res) {
           return sendJson(res, 400, { error: 'Please provide both email and password.' });
         }
 
-        const userRecord = db.getUserByEmail(email);
+        const userRecord = await db.getUserByEmail(email);
         if (!userRecord || !auth.verifyPassword(password, userRecord.salt, userRecord.password_hash)) {
           return sendJson(res, 401, { error: 'Invalid email or password.' });
         }
@@ -202,7 +202,7 @@ async function handleRequest(req, res) {
         const isPersistent = rememberMe !== false; // defaults to true unless explicitly unchecked
         const sessionHours = isPersistent ? SESSION_EXPIRY_HOURS : Math.min(SESSION_EXPIRY_HOURS, 24);
         const sessionToken = auth.generateSessionToken();
-        const { expiresAt } = db.createSession(sessionToken, userRecord.id, sessionHours);
+        const { expiresAt } = await db.createSession(sessionToken, userRecord.id, sessionHours);
 
         let cookieHeader = `${SESSION_COOKIE_NAME}=${sessionToken}; Path=/; HttpOnly; SameSite=Lax`;
         if (isPersistent) {
@@ -223,7 +223,7 @@ async function handleRequest(req, res) {
 
       // 3. AUTH: Check Current Session (Me)
       if (pathname === '/api/auth/me' && method === 'GET') {
-        const user = authenticateRequest(req);
+        const user = await authenticateRequest(req);
         if (!user) {
           return sendJson(res, 401, { error: 'Not authenticated' });
         }
@@ -235,7 +235,7 @@ async function handleRequest(req, res) {
         const cookies = parseCookies(req.headers.cookie);
         const token = cookies[SESSION_COOKIE_NAME];
         if (token) {
-          db.deleteSession(token);
+          await db.deleteSession(token);
         }
         const clearCookie = `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
         return sendJson(res, 200, { success: true }, { 'Set-Cookie': clearCookie });
@@ -250,7 +250,7 @@ async function handleRequest(req, res) {
           return sendJson(res, 400, { error: 'Please provide a valid email address.' });
         }
 
-        const user = db.getUserByEmail(email);
+        const user = await db.getUserByEmail(email);
         if (!user) {
           // Prevent account enumeration by showing consistent message
           return sendJson(res, 200, { 
@@ -261,7 +261,7 @@ async function handleRequest(req, res) {
 
         const resetToken = auth.generateResetToken();
         const expiresAt = Date.now() + 60 * 60 * 1000; // 1 hour
-        db.setPasswordResetToken(email, resetToken, expiresAt);
+        await db.setPasswordResetToken(email, resetToken, expiresAt);
 
         console.log(`\n🔑 [Password Reset Token for ${user.email}]: ${resetToken}\n`);
 
@@ -284,14 +284,14 @@ async function handleRequest(req, res) {
           return sendJson(res, 400, { error: 'New password must be at least 8 characters.' });
         }
 
-        const user = db.getUserByResetToken(token);
+        const user = await db.getUserByResetToken(token);
         if (!user) {
           return sendJson(res, 400, { error: 'Invalid or expired password reset token.' });
         }
 
         const newSalt = auth.generateSalt();
         const newHash = auth.hashPassword(newPassword, newSalt);
-        db.updatePasswordWithToken(token, newHash, newSalt);
+        await db.updatePasswordWithToken(token, newHash, newSalt);
 
         return sendJson(res, 200, { 
           success: true, 
@@ -303,7 +303,7 @@ async function handleRequest(req, res) {
       // PROTECTED ASSIGNMENT ENDPOINTS (ENFORCE USER ISOLATION)
       // ----------------------------------------------------------------------
 
-      const user = authenticateRequest(req);
+      const user = await authenticateRequest(req);
       if (!user) {
         return sendJson(res, 401, { error: 'Unauthorized: Please log in to access your planner.' });
       }
@@ -330,7 +330,7 @@ async function handleRequest(req, res) {
 
       // GET /api/assignments
       if (pathname === '/api/assignments' && method === 'GET') {
-        const assignments = db.getAssignmentsForUser(user.id);
+        const assignments = await db.getAssignmentsForUser(user.id);
         return sendJson(res, 200, { assignments });
       }
 
@@ -355,7 +355,7 @@ async function handleRequest(req, res) {
         }
 
         const id = body.id || 'task_' + crypto.randomBytes(8).toString('hex');
-        const created = db.createAssignment({
+        const created = await db.createAssignment({
           id,
           userId: user.id,
           title,
@@ -395,7 +395,7 @@ async function handleRequest(req, res) {
           return sendJson(res, 400, { error: linkCheck.error });
         }
 
-        const updated = db.updateAssignment({
+        const updated = await db.updateAssignment({
           id,
           userId: user.id,
           title,
@@ -420,7 +420,7 @@ async function handleRequest(req, res) {
       if (completeMatch && method === 'PATCH') {
         const id = completeMatch[1];
         const body = await readJsonBody(req);
-        const updated = db.toggleAssignmentCompleted(id, user.id, Boolean(body.completed));
+        const updated = await db.toggleAssignmentCompleted(id, user.id, Boolean(body.completed));
 
         if (!updated) {
           return sendJson(res, 404, { error: 'Assignment not found or unauthorized.' });
@@ -432,7 +432,7 @@ async function handleRequest(req, res) {
       const deleteMatch = pathname.match(/^\/api\/assignments\/([\w-]+)$/);
       if (deleteMatch && method === 'DELETE') {
         const id = deleteMatch[1];
-        const deleted = db.deleteAssignment(id, user.id);
+        const deleted = await db.deleteAssignment(id, user.id);
         if (!deleted) {
           return sendJson(res, 404, { error: 'Assignment not found or unauthorized.' });
         }
@@ -441,11 +441,11 @@ async function handleRequest(req, res) {
 
       // POST /api/assignments/clear-completed
       if (pathname === '/api/assignments/clear-completed' && method === 'POST') {
-        const all = db.getAssignmentsForUser(user.id);
+        const all = await db.getAssignmentsForUser(user.id);
         const completedList = all.filter(a => a.completed);
-        completedList.forEach(item => {
-          db.deleteAssignment(item.id, user.id);
-        });
+        for (const item of completedList) {
+          await db.deleteAssignment(item.id, user.id);
+        }
         return sendJson(res, 200, { success: true, count: completedList.length, cleared: completedList });
       }
 
@@ -455,8 +455,8 @@ async function handleRequest(req, res) {
         const items = body.items || [];
         const restored = [];
 
-        items.forEach(item => {
-          const resItem = db.createAssignment({
+        for (const item of items) {
+          const resItem = await db.createAssignment({
             id: item.id,
             userId: user.id,
             title: item.title,
@@ -471,7 +471,7 @@ async function handleRequest(req, res) {
             completed: Boolean(item.completed)
           });
           restored.push(resItem);
-        });
+        }
 
         return sendJson(res, 200, { success: true, restored });
       }
@@ -484,7 +484,7 @@ async function handleRequest(req, res) {
       const postSubtaskMatch = pathname.match(/^\/api\/assignments\/([\w-]+)\/subtasks$/);
       if (postSubtaskMatch && method === 'POST') {
         const assignmentId = postSubtaskMatch[1];
-        const assignment = db.getAssignmentById(assignmentId, user.id);
+        const assignment = await db.getAssignmentById(assignmentId, user.id);
         if (!assignment) {
           return sendJson(res, 404, { error: 'Assignment not found or unauthorized.' });
         }
@@ -496,7 +496,7 @@ async function handleRequest(req, res) {
         }
 
         const subtaskId = 'sub_' + crypto.randomBytes(6).toString('hex');
-        const created = db.createSubtask({
+        const created = await db.createSubtask({
           id: subtaskId,
           userId: user.id,
           assignmentId,
@@ -519,7 +519,7 @@ async function handleRequest(req, res) {
         } catch (e) {
           body = {};
         }
-        const updated = db.toggleSubtaskCompleted(id, user.id, body && body.completed !== undefined ? Boolean(body.completed) : undefined);
+        const updated = await db.toggleSubtaskCompleted(id, user.id, body && body.completed !== undefined ? Boolean(body.completed) : undefined);
         if (!updated) {
           return sendJson(res, 404, { error: 'Subtask not found or unauthorized.' });
         }
@@ -530,7 +530,7 @@ async function handleRequest(req, res) {
       const deleteSubtaskMatch = pathname.match(/^\/api\/subtasks\/([\w-]+)$/);
       if (deleteSubtaskMatch && method === 'DELETE') {
         const id = deleteSubtaskMatch[1];
-        const deleted = db.deleteSubtask(id, user.id);
+        const deleted = await db.deleteSubtask(id, user.id);
         if (!deleted) {
           return sendJson(res, 404, { error: 'Subtask not found or unauthorized.' });
         }
@@ -543,7 +543,7 @@ async function handleRequest(req, res) {
 
       // GET /api/study-sessions
       if (pathname === '/api/study-sessions' && method === 'GET') {
-        const sessions = db.getStudySessionsForUser(user.id);
+        const sessions = await db.getStudySessionsForUser(user.id);
         return sendJson(res, 200, { sessions });
       }
 
@@ -568,7 +568,7 @@ async function handleRequest(req, res) {
         }
 
         const id = 'sess_' + crypto.randomBytes(6).toString('hex');
-        const created = db.createStudySession({
+        const created = await db.createStudySession({
           id,
           userId: user.id,
           subject: subject.trim(),
@@ -603,7 +603,7 @@ async function handleRequest(req, res) {
           return sendJson(res, 400, { error: 'Duration must be between 5 and 720 minutes.' });
         }
 
-        const updated = db.updateStudySession({
+        const updated = await db.updateStudySession({
           id,
           userId: user.id,
           subject: subject.trim(),
@@ -623,7 +623,7 @@ async function handleRequest(req, res) {
       const deleteSessionMatch = pathname.match(/^\/api\/study-sessions\/([\w-]+)$/);
       if (deleteSessionMatch && method === 'DELETE') {
         const id = deleteSessionMatch[1];
-        const deleted = db.deleteStudySession(id, user.id);
+        const deleted = await db.deleteStudySession(id, user.id);
         if (!deleted) {
           return sendJson(res, 404, { error: 'Study session not found or unauthorized.' });
         }
@@ -636,14 +636,14 @@ async function handleRequest(req, res) {
 
       // GET /api/reminders
       if (pathname === '/api/reminders' && method === 'GET') {
-        const reminders = db.getRemindersForUser(user.id);
+        const reminders = await db.getRemindersForUser(user.id);
         return sendJson(res, 200, { reminders });
       }
 
       // GET /api/reminders/due (Returns due reminders and marks them delivered)
       if (pathname === '/api/reminders/due' && method === 'GET') {
         const nowIso = new Date().toISOString();
-        const due = db.getDueReminders(user.id, nowIso);
+        const due = await db.getDueReminders(user.id, nowIso);
         return sendJson(res, 200, { due });
       }
 
@@ -655,7 +655,7 @@ async function handleRequest(req, res) {
         if (!assignmentId) {
           return sendJson(res, 400, { error: 'Assignment ID is required.' });
         }
-        const assignment = db.getAssignmentById(assignmentId, user.id);
+        const assignment = await db.getAssignmentById(assignmentId, user.id);
         if (!assignment) {
           return sendJson(res, 404, { error: 'Assignment not found or unauthorized.' });
         }
@@ -668,7 +668,7 @@ async function handleRequest(req, res) {
         }
 
         const reminderId = 'rem_' + crypto.randomBytes(6).toString('hex');
-        const created = db.createReminder({
+        const created = await db.createReminder({
           id: reminderId,
           userId: user.id,
           assignmentId,
@@ -684,7 +684,7 @@ async function handleRequest(req, res) {
       const dismissReminderMatch = pathname.match(/^\/api\/reminders\/([\w-]+)\/dismiss$/);
       if (dismissReminderMatch && method === 'POST') {
         const id = dismissReminderMatch[1];
-        const dismissed = db.dismissReminder(id, user.id);
+        const dismissed = await db.dismissReminder(id, user.id);
         if (!dismissed) {
           return sendJson(res, 404, { error: 'Reminder not found or unauthorized.' });
         }
@@ -695,7 +695,7 @@ async function handleRequest(req, res) {
       const deleteReminderMatch = pathname.match(/^\/api\/reminders\/([\w-]+)$/);
       if (deleteReminderMatch && method === 'DELETE') {
         const id = deleteReminderMatch[1];
-        const deleted = db.deleteReminder(id, user.id);
+        const deleted = await db.deleteReminder(id, user.id);
         if (!deleted) {
           return sendJson(res, 404, { error: 'Reminder not found or unauthorized.' });
         }
@@ -708,8 +708,8 @@ async function handleRequest(req, res) {
 
       // GET /api/insights
       if (pathname === '/api/insights' && method === 'GET') {
-        const assignments = db.getAssignmentsForUser(user.id);
-        const studySessions = db.getStudySessionsForUser(user.id);
+        const assignments = await db.getAssignmentsForUser(user.id);
+        const studySessions = await db.getStudySessionsForUser(user.id);
 
         const now = Date.now();
         const totalAssignments = assignments.length;
