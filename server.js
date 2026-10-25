@@ -879,11 +879,17 @@ async function handleRequest(req, res) {
     safePath = '/index.html';
   }
 
-  const filePath = path.join(ROOT_DIR, safePath);
+  let filePath = path.join(ROOT_DIR, 'public', safePath);
+  if (!fs.existsSync(filePath)) {
+    filePath = path.join(ROOT_DIR, safePath);
+  }
 
   fs.stat(filePath, (err, stats) => {
     if (err || !stats.isFile()) {
-      const indexPath = path.join(ROOT_DIR, 'index.html');
+      let indexPath = path.join(ROOT_DIR, 'public', 'index.html');
+      if (!fs.existsSync(indexPath)) {
+        indexPath = path.join(ROOT_DIR, 'index.html');
+      }
       fs.readFile(indexPath, (indexErr, indexData) => {
         if (indexErr) {
           res.writeHead(404, { 'Content-Type': 'text/plain' });

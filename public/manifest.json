@@ -1,0 +1,65 @@
+{
+  "name": "StudyPath • Student Assignment Planner",
+  "short_name": "StudyPath",
+  "description": "Smart, student-first assignment planner with workload forecasting, countdowns, reminders, and study sessions.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#FAF7F2",
+  "theme_color": "#8C532B",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": [
+    "education",
+    "productivity",
+    "utilities"
+  ],
+  "shortcuts": [
+    {
+      "name": "Priority Queue",
+      "url": "/#queue",
+      "description": "View immediate assignment priorities and countdowns"
+    },
+    {
+      "name": "Weekly Calendar",
+      "url": "/#calendar",
+      "description": "View assignments and study sessions calendar"
+    },
+    {
+      "name": "Workload Insights",
+      "url": "/#workload",
+      "description": "View assignment workloads and study time breakdown"
+    }
+  ]
+}
