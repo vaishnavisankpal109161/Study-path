@@ -129,12 +129,23 @@ let currentView = 'queue'; // 'queue' | 'calendar' | 'workload' | 'sessions' | '
 let calendarDate = new Date();
 let calendarViewMode = 'week'; // 'week' | 'day'
 
-// Sound & Due Alerts state
+// Sound & Due Alerts state (loaded safely in client-side code after DOM mounts)
 let soundChimeAudioCtx = null;
-let isSoundEnabled = localStorage.getItem('studypath_sound_enabled') !== 'false';
+let isSoundEnabled = true;
 const alertedAssignmentIds = new Set();
 const dismissedAlertIds = new Set();
 const expandedSubtasksAssignmentIds = new Set();
+
+function loadStoredPreferences() {
+  if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('studypath_sound_enabled');
+      if (stored !== null) {
+        isSoundEnabled = stored !== 'false';
+      }
+    } catch (e) {}
+  }
+}
 
 // ============================================================================
 // 3. API SERVICE LAYER
@@ -177,19 +188,31 @@ async function checkAuthSession() {
   const bootLoader = document.getElementById('session-boot-loader');
 
   // Check if user directly navigated to a protected route (e.g. #calendar, #workload)
-  const initialHash = window.location.hash.replace(/^#\/?/, '').toLowerCase();
+  const initialHash = (typeof window !== 'undefined' && window.location?.hash)
+    ? window.location.hash.replace(/^#\/?/, '').toLowerCase()
+    : '';
   const validViews = ['queue', 'calendar', 'workload', 'sessions', 'reminders'];
   if (validViews.includes(initialHash)) {
     redirectAfterLogin = initialHash;
-    sessionStorage.setItem('studypath_redirect_after_login', initialHash);
+    if (typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined') {
+      try {
+        sessionStorage.setItem('studypath_redirect_after_login', initialHash);
+      } catch (e) {}
+    }
   }
 
   try {
     const data = await apiRequest('/api/auth/me');
     if (data.user) {
       currentUser = data.user;
-      const target = redirectAfterLogin || sessionStorage.getItem('studypath_redirect_after_login') || (validViews.includes(initialHash) ? initialHash : 'queue');
-      sessionStorage.removeItem('studypath_redirect_after_login');
+      let savedRedirect = null;
+      if (typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined') {
+        try {
+          savedRedirect = sessionStorage.getItem('studypath_redirect_after_login');
+          sessionStorage.removeItem('studypath_redirect_after_login');
+        } catch (e) {}
+      }
+      const target = redirectAfterLogin || savedRedirect || (validViews.includes(initialHash) ? initialHash : 'queue');
       redirectAfterLogin = null;
       showAppView(target);
       await loadAllUserData();
@@ -299,7 +322,11 @@ async function handleLogout() {
   } catch (e) {
     console.warn('Logout network error', e);
   } finally {
-    sessionStorage.removeItem('studypath_redirect_after_login');
+    if (typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined') {
+      try {
+        sessionStorage.removeItem('studypath_redirect_after_login');
+      } catch (e) {}
+    }
     redirectAfterLogin = null;
     showAuthView();
     showToast('Signed out successfully.');
@@ -1598,7 +1625,11 @@ async function playNotificationChime(userInitiated = false) {
 
     if (userInitiated) {
       isSoundEnabled = true;
-      localStorage.setItem('studypath_sound_enabled', 'true');
+      if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+        try {
+          localStorage.setItem('studypath_sound_enabled', 'true');
+        } catch (e) {}
+      }
       if (soundChimeAudioCtx.state === 'suspended') {
         await soundChimeAudioCtx.resume();
       }
@@ -2375,8 +2406,14 @@ function initAuthHandlers() {
       passEl.value = '';
       currentUser = data.user;
 
-      const target = redirectAfterLogin || sessionStorage.getItem('studypath_redirect_after_login') || 'queue';
-      sessionStorage.removeItem('studypath_redirect_after_login');
+      let savedRedirect = null;
+      if (typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined') {
+        try {
+          savedRedirect = sessionStorage.getItem('studypath_redirect_after_login');
+          sessionStorage.removeItem('studypath_redirect_after_login');
+        } catch (e) {}
+      }
+      const target = redirectAfterLogin || savedRedirect || 'queue';
       redirectAfterLogin = null;
 
       showAppView(target);
@@ -2394,7 +2431,9 @@ function initAuthHandlers() {
 
   // Intercept protected page navigation & login redirection
   window.addEventListener('hashchange', () => {
-    const rawHash = window.location.hash.replace(/^#\/?/, '').toLowerCase();
+    const rawHash = (typeof window !== 'undefined' && window.location?.hash)
+      ? window.location.hash.replace(/^#\/?/, '').toLowerCase()
+      : '';
     const validViews = ['queue', 'calendar', 'workload', 'sessions', 'reminders'];
 
     if (currentUser) {
@@ -2410,7 +2449,11 @@ function initAuthHandlers() {
     } else {
       if (validViews.includes(rawHash)) {
         redirectAfterLogin = rawHash;
-        sessionStorage.setItem('studypath_redirect_after_login', rawHash);
+        if (typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined') {
+          try {
+            sessionStorage.setItem('studypath_redirect_after_login', rawHash);
+          } catch (e) {}
+        }
         showAuthView();
         setAuthAlert('Please sign in to access your student planner.', 'info');
       }
@@ -2884,13 +2927,21 @@ function initEventListeners() {
     if (isSoundEnabled && soundChimeAudioCtx && soundChimeAudioCtx.state === 'running') {
       // Toggle off
       isSoundEnabled = false;
-      localStorage.setItem('studypath_sound_enabled', 'false');
+      if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+        try {
+          localStorage.setItem('studypath_sound_enabled', 'false');
+        } catch (e) {}
+      }
       updateSoundUI();
       showToast('Audio chime muted.');
     } else {
       // Toggle on / unlock
       isSoundEnabled = true;
-      localStorage.setItem('studypath_sound_enabled', 'true');
+      if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+        try {
+          localStorage.setItem('studypath_sound_enabled', 'true');
+        } catch (e) {}
+      }
       const played = await playNotificationChime(true);
       updateSoundUI();
       if (played) {
@@ -3479,7 +3530,13 @@ function initPwaHandlers() {
   }
 
   function showSwUpdateNotice() {
-    if (sessionStorage.getItem('studypath_update_dismissed') === 'true') {
+    let isDismissed = false;
+    if (typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined') {
+      try {
+        isDismissed = sessionStorage.getItem('studypath_update_dismissed') === 'true';
+      } catch (e) {}
+    }
+    if (isDismissed) {
       return;
     }
     if (swUpdateBanner) {
@@ -3511,7 +3568,11 @@ function initPwaHandlers() {
 
   if (btnSwDismiss) {
     btnSwDismiss.addEventListener('click', () => {
-      sessionStorage.setItem('studypath_update_dismissed', 'true');
+      if (typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined') {
+        try {
+          sessionStorage.setItem('studypath_update_dismissed', 'true');
+        } catch (e) {}
+      }
       hideSwUpdateNotice();
     });
   }
@@ -3716,6 +3777,7 @@ function initPwaHandlers() {
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
+  loadStoredPreferences();
   updateTodayDateDisplay();
   initEventListeners();
   startCountdownTimer();
