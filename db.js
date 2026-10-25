@@ -23,15 +23,25 @@ try {
   }
 }
 
-const DB_PATH = path.join(DATA_DIR, 'studypath.db');
-const db = new DatabaseSync(DB_PATH);
+let db;
+try {
+  const DB_PATH = path.join(DATA_DIR, 'studypath.db');
+  db = new DatabaseSync(DB_PATH);
+} catch (diskErr) {
+  console.warn('Fallback to in-memory SQLite database:', diskErr.message);
+  db = new DatabaseSync(':memory:');
+}
 
 // Enable foreign keys and appropriate journal mode
-db.exec('PRAGMA foreign_keys = ON;');
-if (isServerless) {
-  db.exec('PRAGMA journal_mode = MEMORY;');
-} else {
-  db.exec('PRAGMA journal_mode = WAL;');
+try {
+  db.exec('PRAGMA foreign_keys = ON;');
+  if (isServerless) {
+    db.exec('PRAGMA journal_mode = MEMORY;');
+  } else {
+    db.exec('PRAGMA journal_mode = WAL;');
+  }
+} catch (pragmaErr) {
+  console.warn('Pragma setup error:', pragmaErr.message);
 }
 
 /**
