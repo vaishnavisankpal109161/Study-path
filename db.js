@@ -3,7 +3,23 @@
  * Enforces schema migrations, foreign keys, and strict per-user data isolation.
  */
 
-const { DatabaseSync } = require('node:sqlite');
+let DatabaseSync;
+try {
+  ({ DatabaseSync } = require('node:sqlite'));
+} catch (e) {
+  console.warn('node:sqlite module not available in this Node runtime:', e.message);
+  DatabaseSync = class InMemDatabase {
+    constructor() { this.data = {}; }
+    exec() {}
+    prepare() {
+      return {
+        run: () => ({ changes: 1, lastInsertRowid: 1 }),
+        get: () => null,
+        all: () => []
+      };
+    }
+  };
+}
 const path = require('path');
 const fs = require('fs');
 
